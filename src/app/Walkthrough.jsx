@@ -51,7 +51,55 @@ function compressImage(file,maxW=1200,quality=0.7){
   });
 }
 
-/* ══════════════════════════════════════════════════════════ */
+/* ── Barcode Scanner ──────────────────────────────────── */
+function BarcodeScanner({onScan,onClose,label}){
+  const videoRef=useState(null);
+  const [err,setErr]=useState(null);
+  const [active,setActive]=useState(true);
+  useEffect(()=>{
+    let stream=null;let animId=null;let detector=null;
+    const start=async()=>{
+      try{
+        if(typeof BarcodeDetector!=="undefined")detector=new BarcodeDetector({formats:["code_128","code_39","ean_13","ean_8","qr_code","upc_a","upc_e","codabar","itf"]});
+        stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}}});
+        if(videoRef[0])videoRef[0].srcObject=stream;
+        const scan=async()=>{
+          if(!active||!videoRef[0]||videoRef[0].readyState<2){animId=requestAnimationFrame(scan);return;}
+          if(detector){try{const codes=await detector.detect(videoRef[0]);if(codes.length>0){onScan(codes[0].rawValue);cleanup();return;}}catch{}}
+          animId=requestAnimationFrame(scan);
+        };
+        scan();
+      }catch(e){setErr("Camera access denied. Enter manually.");}
+    };
+    const cleanup=()=>{if(stream)stream.getTracks().forEach(t=>t.stop());if(animId)cancelAnimationFrame(animId);};
+    start();return cleanup;
+  },[]);
+  return(
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.9)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+      <div style={{color:"#fff",fontSize:14,fontWeight:700,marginBottom:12}}>{label||"Scan Barcode"}</div>
+      {err?<div style={{color:"#fca5a5",fontSize:13,padding:20,textAlign:"center"}}>{err}</div>:
+        <video ref={el=>videoRef[0]=el} autoPlay playsInline muted style={{width:"90%",maxWidth:400,borderRadius:12,border:"3px solid #2563eb"}}/>}
+      <div style={{marginTop:16,display:"flex",gap:8}}>
+        <button onClick={onClose} style={{padding:"12px 24px",borderRadius:8,border:"none",background:"#dc2626",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Scan Input (text field + scan button) ────────────── */
+function ScanInput({value,onChange,placeholder,label,style:st}){
+  const [scanning,setScanning]=useState(false);
+  return(
+    <div>
+      {label&&<label style={{display:"block",fontSize:10,fontWeight:600,color:"#6b7280",marginBottom:2}}>{label}</label>}
+      <div style={{display:"flex",gap:4}}>
+        <input style={{...({width:"100%",padding:"10px 12px",border:"1.5px solid #d1d5db",borderRadius:10,fontSize:14,background:"#fff",color:"#111",boxSizing:"border-box",outline:"none",fontFamily:"inherit",WebkitAppearance:"none"}),...st,flex:1}} value={value||""} onChange={e=>onChange(e.target.value)} placeholder={placeholder||"Scan or type..."}/>
+        <button onClick={()=>setScanning(true)} style={{padding:"10px 12px",borderRadius:10,border:"1.5px solid #2563eb",background:"#2563eb15",color:"#2563eb",fontWeight:700,fontSize:12,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>Scan</button>
+      </div>
+      {scanning&&<BarcodeScanner label={label} onScan={v=>{onChange(v);setScanning(false);}} onClose={()=>setScanning(false)}/>}
+    </div>
+  );
+}
 export default function Walkthrough() {
   const [view,setView]=useState("jobs");
   const [mode,setMode]=useState("walkthrough"); // walkthrough | pickup | intake
@@ -154,6 +202,7 @@ export default function Walkthrough() {
     ebayCompAvg:0,priceBookValue:0,estimatedWeight:0,
     conditionNotes:"",photos:[],missing:[],breakers:[],
     acquisitionCost:"",refurbCost:"",askingPrice:"",
+    barcodeSku:"",putawayLocation:"",
     // Pickup fields
     pickupStatus:"pending",destination:"main_warehouse",
   }]);
@@ -296,6 +345,9 @@ export default function Walkthrough() {
           kva_rating:it.kvaRating||null,
           winding_material:it.windingMaterial||null,
           interrupting_rating:it.interruptRating||null,
+          barcode_sku:it.barcodeSku||null,
+          putaway_location:it.putawayLocation||null,
+          received_verified:true,verified_by:job.preparedBy||null,verified_date:job.bidDate||today(),
         };
 
         let ok=false;
@@ -474,6 +526,48 @@ export default function Walkthrough() {
       }catch{loc=true;}
     }
     await sS("wes_wt",jobs);
+  };
+
+  /* ── Receive verification: confirm arrival + putaway + SKU ── */
+  const [recvModal,setRecvModal]=useState(null); // {jobId, lineIdx, item}
+  const [recvPutaway,setRecvPutaway]=useState("");
+  const [recvSku,setRecvSku]=useState("");
+  const [recvBy,setRecvBy]=useState("");
+
+  const openReceiveModal=(jobId,lineIdx,item)=>{
+    setRecvModal({jobId,lineIdx,item});
+    setRecvPutaway(item.putaway_location||"");
+    setRecvSku(item.barcode_sku||item.barcodeSku||"");
+    setRecvBy("");
+  };
+
+  const confirmReceive=async()=>{
+    if(!recvModal)return;
+    const {jobId,lineIdx,item}=recvModal;
+    const invId=item.inventory_id;
+
+    // Patch inventory record with putaway + barcode + verified
+    if(invId&&!loc){
+      try{
+        await dbF(`inventory_items?id=eq.${encodeURIComponent(invId)}`,{method:"PATCH",body:JSON.stringify({
+          putaway_location:recvPutaway||null,
+          barcode_sku:recvSku||null,
+          received_verified:true,
+          verified_by:recvBy||null,
+          verified_date:today(),
+        })});
+      }catch{loc=true;}
+    }
+
+    // Patch bid line item
+    await patchLineItem(jobId,lineIdx,{
+      receive_status:"verified",
+      putaway_location:recvPutaway||null,
+      barcode_sku:recvSku||null,
+    });
+
+    setMsg({t:"success",m:`${invId||"Item"} verified. Putaway: ${recvPutaway||"N/A"}`});
+    setRecvModal(null);
   };
 
   /* ── Export ── */
@@ -693,6 +787,10 @@ export default function Walkthrough() {
               <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                 {LOC.filter(l=>l.v!=="scrap_yard").map(l=><button key={l.v} onClick={()=>uItem(i,"destination",l.v)} style={{padding:"6px 10px",borderRadius:6,border:`1.5px solid ${(it.destination||"main_warehouse")===l.v?"#2563eb":"#e2e8f0"}`,background:(it.destination||"main_warehouse")===l.v?"#2563eb15":"#fff",color:(it.destination||"main_warehouse")===l.v?"#2563eb":"#94a3b8",fontWeight:600,fontSize:10,cursor:"pointer"}}>{l.l}</button>)}
               </div></div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:8}}>
+                <ScanInput label="Putaway Location" value={it.putawayLocation} onChange={v=>uItem(i,"putawayLocation",v)} placeholder="Scan bin/rack..."/>
+                <ScanInput label="SKU / Barcode" value={it.barcodeSku} onChange={v=>uItem(i,"barcodeSku",v)} placeholder="Scan or assign..."/>
+              </div>
             </div>}
           </div>
         ))}
@@ -768,13 +866,28 @@ export default function Walkthrough() {
                     </div>}
                     {/* Current assignment display */}
                     {(it.disposition&&it.disposition!=="unassigned")&&<div style={{marginTop:4,fontSize:10,color:dc[it.disposition]||"#6b7280",fontWeight:600}}>{it.disposition}{it.destination?` \u2192 ${LOC.find(l=>l.v===it.destination)?.l||it.destination}`:""}</div>}
-                    {/* Pickup controls per item */}
+                    {/* Pickup + Receive controls per item */}
                     {(b.status==="accepted"||b.mode==="pickup")&&(
                       <div style={{marginTop:6}}>
                         {pickedUp?(
-                          <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            <span style={{color:"#16a34a",fontWeight:700,fontSize:11}}>{"\u2713"} Picked up</span>
-                            {(it.inventory_id)&&<span style={{fontSize:10,color:"#6b7280"}}>{it.inventory_id}</span>}
+                          <div>
+                            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                              <span style={{color:"#16a34a",fontWeight:700,fontSize:11}}>{"\u2713"} Picked up</span>
+                              {(it.inventory_id)&&<span style={{fontSize:10,color:"#6b7280"}}>{it.inventory_id}</span>}
+                            </div>
+                            {/* Receive verification */}
+                            {(it.receive_status==="verified"||it.receiveStatus==="verified")?(
+                              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                                <span style={{color:"#8b5cf6",fontWeight:700,fontSize:11}}>{"\u2713"} Received</span>
+                                {(it.putaway_location||it.putawayLocation)&&<span style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:"#8b5cf618",color:"#8b5cf6",fontWeight:600}}>{it.putaway_location||it.putawayLocation}</span>}
+                                {(it.barcode_sku||it.barcodeSku)&&<span style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:"#f59e0b18",color:"#f59e0b",fontWeight:600}}>SKU: {it.barcode_sku||it.barcodeSku}</span>}
+                              </div>
+                            ):(
+                              <button onClick={e=>{e.stopPropagation();openReceiveModal(b.id,j,it);}}
+                                style={{width:"100%",padding:10,borderRadius:8,border:"none",background:"linear-gradient(135deg,#8b5cf6,#7c3aed)",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                                {"\uD83D\uDCE6"} Verify Receipt + Putaway
+                              </button>
+                            )}
                           </div>
                         ):(
                           <button onClick={e=>{e.stopPropagation();pickupItem(b,it,j);}}
@@ -797,6 +910,30 @@ export default function Walkthrough() {
               </div>}
             </div>);
         })}
+      </div>}
+
+      {/* ═══ RECEIVE VERIFICATION MODAL ═══ */}
+      {recvModal&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:9998,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setRecvModal(null)}>
+        <div style={{background:"#fff",borderRadius:16,padding:20,maxWidth:400,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>Verify Receipt</div>
+          <div style={{fontSize:12,color:"#6b7280",marginBottom:16}}>{recvModal.item.equipment_type} {recvModal.item.manufacturer||""} {recvModal.item.amperage_rating?recvModal.item.amperage_rating+"A":""}<br/>S/N: {recvModal.item.serial_number||"N/A"} | {recvModal.item.inventory_id||""}</div>
+
+          <div style={{marginBottom:12}}>
+            <ScanInput label="Putaway Location (scan bin/rack barcode)" value={recvPutaway} onChange={setRecvPutaway} placeholder="LOC-A1-01"/>
+          </div>
+          <div style={{marginBottom:12}}>
+            <ScanInput label="SKU / Barcode (scan or assign)" value={recvSku} onChange={setRecvSku} placeholder="WES-00001"/>
+          </div>
+          <div style={{marginBottom:16}}>
+            <label style={{display:"block",fontSize:10,fontWeight:600,color:"#6b7280",marginBottom:2}}>Verified By</label>
+            <input style={{width:"100%",padding:"10px 12px",border:"1.5px solid #d1d5db",borderRadius:10,fontSize:14,background:"#fff",color:"#111",boxSizing:"border-box",outline:"none",fontFamily:"inherit"}} value={recvBy} onChange={e=>setRecvBy(e.target.value)} placeholder="Your name"/>
+          </div>
+
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setRecvModal(null)} style={{flex:1,padding:14,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#6b7280",fontWeight:700,fontSize:14,cursor:"pointer"}}>Cancel</button>
+            <button onClick={confirmReceive} style={{flex:2,padding:14,borderRadius:10,border:"none",background:"linear-gradient(135deg,#8b5cf6,#7c3aed)",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>{"\u2713"} Confirm Received</button>
+          </div>
+        </div>
       </div>}
     </div>);
 }
