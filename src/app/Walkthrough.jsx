@@ -175,11 +175,35 @@ export default function Walkthrough() {
       const resp=await fetch(`${SB}/functions/v1/scan-nameplate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image_base64:b64,media_type:file.type})});
       if(!resp.ok)throw new Error(`${resp.status}`);
       const p=await resp.json();if(p.error)throw new Error(p.error);
+      // Fuzzy match manufacturer
+      const mfrMatch=MFR.find(m=>{
+        if(!p.manufacturer)return false;
+        const raw=p.manufacturer.toLowerCase().trim();
+        const parts=m.toLowerCase().split(/[\/\s]+/);
+        return parts.some(part=>part.length>2&&raw.includes(part))||raw.includes(m.toLowerCase());
+      });
+      // Determine if KVA is the primary rating (transformers)
+      const isTransformer=p.equipment_type&&p.equipment_type.toLowerCase().includes("transformer");
+      const kva=p.kva_rating||p.amperage_rating||(isTransformer?p.amperage_rating:null);
+      const amps=isTransformer?null:(p.amperage_rating||null);
+      // Winding material normalization
+      let winding=p.winding_material||null;
+      if(winding){
+        const wl=winding.toLowerCase();
+        if(wl.includes("copper")||wl==="cu")winding="CU";
+        else if(wl.includes("aluminum")||wl.includes("aluminium")||wl==="al")winding="AL";
+      }
       setItems(prev=>prev.map((it,i)=>i===idx?{...it,
-        serialNumber:p.serial_number||it.serialNumber,modelNumber:p.model_number||it.modelNumber,
-        voltageRating:p.voltage_rating||it.voltageRating,amperageRating:p.amperage_rating||it.amperageRating,
-        manufacturer:MFR.find(m=>p.manufacturer&&m.toLowerCase().includes(p.manufacturer.toLowerCase().split("/")[0].trim()))||it.manufacturer,
+        serialNumber:p.serial_number||it.serialNumber,
+        modelNumber:p.model_number||it.modelNumber,
+        voltageRating:p.voltage_rating||it.voltageRating,
+        amperageRating:amps||it.amperageRating,
+        kvaRating:kva||it.kvaRating,
+        manufacturer:mfrMatch||it.manufacturer,
         equipmentType:EQ.find(t=>p.equipment_type&&t.toLowerCase().includes(p.equipment_type.toLowerCase()))||it.equipmentType,
+        phase:p.phase?String(p.phase).replace(/[^0-9]/g,""):it.phase,
+        yearMfg:p.year_manufactured||it.yearMfg,
+        windingMaterial:winding||it.windingMaterial,
       }:it));
       setMsg({t:"success",m:"Nameplate scanned."});
     }catch(e){setMsg({t:"error",m:"Scan failed: "+e.message});}
