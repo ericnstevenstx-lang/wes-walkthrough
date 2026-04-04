@@ -184,26 +184,36 @@ export default function Walkthrough() {
       });
       // Determine if KVA is the primary rating (transformers)
       const isTransformer=p.equipment_type&&p.equipment_type.toLowerCase().includes("transformer");
-      const kva=p.kva_rating||p.amperage_rating||(isTransformer?p.amperage_rating:null);
+      const kva=p.kva_rating||(isTransformer?p.amperage_rating:null);
       const amps=isTransformer?null:(p.amperage_rating||null);
-      // Winding material normalization
+      // Winding: use combined or HV/LV split
+      const whv=p.winding_hv||null;
+      const wlv=p.winding_lv||null;
       let winding=p.winding_material||null;
-      if(winding){
-        const wl=winding.toLowerCase();
-        if(wl.includes("copper")||wl==="cu")winding="CU";
-        else if(wl.includes("aluminum")||wl.includes("aluminium")||wl==="al")winding="AL";
-      }
+      if(!winding&&whv)winding=whv===wlv?whv:`${whv}/${wlv}`;
+      // Weight from nameplate
+      const npWeight=p.weight_lbs?parseFloat(String(p.weight_lbs).replace(/[^0-9.]/g,"")):(p.core_coil_weight_lbs?parseFloat(String(p.core_coil_weight_lbs).replace(/[^0-9.]/g,"")):null);
+      // Cooling class determines oil vs dry
+      const cooling=p.cooling_class||null;
+      const liquid=p.liquid_type||(cooling&&(cooling.startsWith("OA")||cooling.startsWith("O"))?"OIL":cooling&&(cooling.startsWith("AA")||cooling==="dry")?"DRY":null);
+
       setItems(prev=>prev.map((it,i)=>i===idx?{...it,
         serialNumber:p.serial_number||it.serialNumber,
         modelNumber:p.model_number||it.modelNumber,
         voltageRating:p.voltage_rating||it.voltageRating,
         amperageRating:amps||it.amperageRating,
         kvaRating:kva||it.kvaRating,
+        kvaForced:p.kva_forced||it.kvaForced,
         manufacturer:mfrMatch||it.manufacturer,
         equipmentType:EQ.find(t=>p.equipment_type&&t.toLowerCase().includes(p.equipment_type.toLowerCase()))||it.equipmentType,
         phase:p.phase?String(p.phase).replace(/[^0-9]/g,""):it.phase,
         yearMfg:p.year_manufactured||it.yearMfg,
         windingMaterial:winding||it.windingMaterial,
+        windingHv:whv||it.windingHv,
+        windingLv:wlv||it.windingLv,
+        coolingClass:cooling||it.coolingClass,
+        liquidType:liquid||it.liquidType,
+        nameplateWeight:npWeight||it.nameplateWeight,
       }:it));
       setMsg({t:"success",m:"Nameplate scanned."});
     }catch(e){setMsg({t:"error",m:"Scan failed: "+e.message});}
@@ -221,7 +231,7 @@ export default function Walkthrough() {
   const addItem=()=>setItems(p=>[...p,{
     equipmentType:"",manufacturer:"",modelNumber:"",serialNumber:"",
     voltageRating:"",amperageRating:"",quantity:1,grade:"C",
-    nemaRating:"",indoorOutdoor:"indoor",yearMfg:"",phase:"3",kvaRating:"",windingMaterial:"",interruptRating:"",
+    nemaRating:"",indoorOutdoor:"indoor",yearMfg:"",phase:"3",kvaRating:"",kvaForced:"",windingMaterial:"",windingHv:"",windingLv:"",interruptRating:"",coolingClass:"",liquidType:"",nameplateWeight:"",
     disposition:"unassigned",estimatedResale:0,estimatedScrap:0,
     ebayCompAvg:0,priceBookValue:0,estimatedWeight:0,
     conditionNotes:"",photos:[],missing:[],breakers:[],
@@ -291,8 +301,10 @@ export default function Walkthrough() {
     msg+=`*EQUIPMENT (${its.length} items):*\n`;
     its.forEach((it,i)=>{
       msg+=`${i+1}. ${it.equipmentType||it.equipment_type} ${it.manufacturer||""}\n`;
-      msg+=`   ${it.amperageRating||it.amperage_rating||""}A ${it.voltageRating||it.voltage_rating||""}V${it.kvaRating||it.kva_rating?` ${it.kvaRating||it.kva_rating}KVA`:""} ${it.phase||"3"}PH\n`;
-      msg+=`   S/N: ${it.serialNumber||it.serial_number||"N/A"}${it.nemaRating||it.nema_rating?` | NEMA ${it.nemaRating||it.nema_rating}`:""}${it.indoorOutdoor||it.indoor_outdoor?` | ${(it.indoorOutdoor||it.indoor_outdoor||"").toUpperCase()}`:""}${it.yearMfg||it.year_manufactured?` | Yr: ${it.yearMfg||it.year_manufactured}`:""}\n`;
+      msg+=`   ${it.amperageRating||it.amperage_rating||""}${(it.amperageRating||it.amperage_rating)?"A ":""}${it.voltageRating||it.voltage_rating||""}V${it.kvaRating||it.kva_rating?` ${it.kvaRating||it.kva_rating}${it.kvaForced||it.kva_forced?`/${it.kvaForced||it.kva_forced}`:""}KVA`:""} ${it.phase||"3"}PH\n`;
+      const wh=it.windingHv||it.winding_hv;const wl=it.windingLv||it.winding_lv;const liq=it.liquidType||it.liquid_type;const cc=it.coolingClass||it.cooling_class;
+      msg+=`   S/N: ${it.serialNumber||it.serial_number||"N/A"}${it.nemaRating||it.nema_rating?` | NEMA ${it.nemaRating||it.nema_rating}`:""}${(it.indoorOutdoor||it.indoor_outdoor)?` | ${(it.indoorOutdoor||it.indoor_outdoor||"").toUpperCase()}`:""}${it.yearMfg||it.year_manufactured?` | Yr: ${it.yearMfg||it.year_manufactured}`:""}\n`;
+      if(wh||liq||cc)msg+=`   ${wh?`Wind: HV=${wh}${wl?` LV=${wl}`:""}`:""} ${cc?`Class: ${cc}`:""} ${liq?`Type: ${liq}`:""}\n`;
       msg+=`   Grade: ${it.grade} | ${it.disposition}\n`;
       if(it.disposition!=="scrap")msg+=`   Est Value: $${parseFloat(it.estimatedResale||it.estimated_resale||0).toFixed(0)}\n`;
       else msg+=`   Scrap: $${parseFloat(it.estimatedScrap||it.estimated_scrap||0).toFixed(0)}\n`;
@@ -367,7 +379,13 @@ export default function Walkthrough() {
           year_manufactured:it.yearMfg?parseInt(it.yearMfg):null,
           phase:it.phase||"3",
           kva_rating:it.kvaRating||null,
+          kva_forced:it.kvaForced||null,
           winding_material:it.windingMaterial||null,
+          winding_hv:it.windingHv||null,
+          winding_lv:it.windingLv||null,
+          cooling_class:it.coolingClass||null,
+          liquid_type:it.liquidType||null,
+          nameplate_weight_lbs:it.nameplateWeight?parseFloat(it.nameplateWeight):null,
           interrupting_rating:it.interruptRating||null,
           barcode_sku:it.barcodeSku||null,
           putaway_location:it.putawayLocation||null,
@@ -414,7 +432,7 @@ export default function Walkthrough() {
       const bkrDetail=bkrs.map(b=>`${b.count}x ${b.amp}A ${b.poles}P ${b.grade} ${b.oem}${b.pitting?" PITTING":""}${b.contactWear?" WEAR":""}`).join("; ");
       const condNotes=[it.conditionNotes,bkrDetail?`Breakers: ${bkrDetail}`:""].filter(Boolean).join(" | ");
       return {
-      bid_id:id,equipment_type:it.equipmentType,manufacturer:it.manufacturer||null,model_number:it.modelNumber||null,serial_number:it.serialNumber||null,voltage_rating:it.voltageRating||null,amperage_rating:it.amperageRating||null,quantity:it.quantity,grade:it.grade,disposition:it.disposition,estimated_resale:parseFloat(it.estimatedResale)||null,estimated_scrap:it.estimatedScrap||null,ebay_comp_avg:it.ebayCompAvg||null,price_book_value:it.priceBookValue||null,estimated_weight_lbs:it.estimatedWeight||null,breaker_count:bkrCount||null,breaker_value:null,notes:condNotes||null,sort_order:i,photo_count:(it.photos||[]).length,pickup_status:it.pickupStatus||"pending",destination:it.destination||null,nema_rating:it.nemaRating||null,indoor_outdoor:it.indoorOutdoor||"indoor",year_manufactured:it.yearMfg?parseInt(it.yearMfg):null,phase:it.phase||"3",kva_rating:it.kvaRating||null,winding_material:it.windingMaterial||null,interrupting_rating:it.interruptRating||null,
+      bid_id:id,equipment_type:it.equipmentType,manufacturer:it.manufacturer||null,model_number:it.modelNumber||null,serial_number:it.serialNumber||null,voltage_rating:it.voltageRating||null,amperage_rating:it.amperageRating||null,quantity:it.quantity,grade:it.grade,disposition:it.disposition,estimated_resale:parseFloat(it.estimatedResale)||null,estimated_scrap:it.estimatedScrap||null,ebay_comp_avg:it.ebayCompAvg||null,price_book_value:it.priceBookValue||null,estimated_weight_lbs:it.nameplateWeight?parseFloat(it.nameplateWeight):(it.estimatedWeight||null),breaker_count:bkrCount||null,breaker_value:null,notes:condNotes||null,sort_order:i,photo_count:(it.photos||[]).length,pickup_status:it.pickupStatus||"pending",destination:it.destination||null,nema_rating:it.nemaRating||null,indoor_outdoor:it.indoorOutdoor||"indoor",year_manufactured:it.yearMfg?parseInt(it.yearMfg):null,phase:it.phase||"3",kva_rating:it.kvaRating||null,kva_forced:it.kvaForced||null,winding_material:it.windingMaterial||null,winding_hv:it.windingHv||null,winding_lv:it.windingLv||null,cooling_class:it.coolingClass||null,liquid_type:it.liquidType||null,nameplate_weight_lbs:it.nameplateWeight?parseFloat(it.nameplateWeight):null,interrupting_rating:it.interruptRating||null,
     };});
     try{
       let ok=false;
@@ -471,7 +489,13 @@ export default function Walkthrough() {
       year_manufactured:lineItem.year_manufactured||lineItem.yearMfg?parseInt(lineItem.year_manufactured||lineItem.yearMfg):null,
       phase:lineItem.phase||"3",
       kva_rating:lineItem.kva_rating||lineItem.kvaRating||null,
+      kva_forced:lineItem.kva_forced||lineItem.kvaForced||null,
       winding_material:lineItem.winding_material||lineItem.windingMaterial||null,
+      winding_hv:lineItem.winding_hv||lineItem.windingHv||null,
+      winding_lv:lineItem.winding_lv||lineItem.windingLv||null,
+      cooling_class:lineItem.cooling_class||lineItem.coolingClass||null,
+      liquid_type:lineItem.liquid_type||lineItem.liquidType||null,
+      nameplate_weight_lbs:lineItem.nameplate_weight_lbs||lineItem.nameplateWeight?parseFloat(lineItem.nameplate_weight_lbs||lineItem.nameplateWeight):null,
       interrupting_rating:lineItem.interrupting_rating||lineItem.interruptRating||null,
     };
 
@@ -598,9 +622,9 @@ export default function Walkthrough() {
   const esc=v=>{const s=String(v??"");return s.includes(",")||s.includes('"')?`"${s.replace(/"/g,'""')}"`:s;};
   const exportCSV=(b)=>{
     const its=b.items||b.bid_line_items||[];
-    const h=["ID","Job","Customer","Date","Mode","Equipment","Mfr","S/N","Amps","Volts","KVA","Phase","NEMA","In/Out","Year","Winding","kAIC","Grade","Disposition","Dest","Qty","Resale $","Scrap $","eBay Avg","Photos","Condition","COGS","Revenue","Margin %"];
+    const h=["ID","Job","Customer","Date","Mode","Equipment","Mfr","S/N","Amps","Volts","KVA","KVA FA","Phase","NEMA","In/Out","Year","HV Wind","LV Wind","Class","Liquid","Weight","kAIC","Grade","Disposition","Dest","Qty","Resale $","Scrap $","eBay Avg","Photos","Condition","COGS","Revenue","Margin %"];
     const l=[h.map(esc).join(",")];
-    its.forEach((it,i)=>{l.push([esc(b.id),esc(b.job_name),esc(b.customer_name),esc(b.bid_date),esc(b.mode),esc(it.equipment_type),esc(it.manufacturer),esc(it.serial_number),esc(it.amperage_rating),esc(it.voltage_rating),esc(it.kva_rating),esc(it.phase),esc(it.nema_rating),esc(it.indoor_outdoor),esc(it.year_manufactured),esc(it.winding_material),esc(it.interrupting_rating),esc(it.grade),esc(it.disposition),esc(it.destination),esc(it.quantity),esc(it.estimated_resale),esc(it.estimated_scrap),esc(it.ebay_comp_avg),esc(it.photo_count||(it.photos||[]).length),esc(it.notes),esc(i===0?b.total_cogs:""),esc(i===0?b.total_revenue:""),esc(i===0?b.gross_margin_pct:"")].join(","));});
+    its.forEach((it,i)=>{l.push([esc(b.id),esc(b.job_name),esc(b.customer_name),esc(b.bid_date),esc(b.mode),esc(it.equipment_type),esc(it.manufacturer),esc(it.serial_number),esc(it.amperage_rating),esc(it.voltage_rating),esc(it.kva_rating),esc(it.kva_forced),esc(it.phase),esc(it.nema_rating),esc(it.indoor_outdoor),esc(it.year_manufactured),esc(it.winding_hv),esc(it.winding_lv),esc(it.cooling_class),esc(it.liquid_type),esc(it.nameplate_weight_lbs||it.estimated_weight_lbs),esc(it.interrupting_rating),esc(it.grade),esc(it.disposition),esc(it.destination),esc(it.quantity),esc(it.estimated_resale),esc(it.estimated_scrap),esc(it.ebay_comp_avg),esc(it.photo_count||(it.photos||[]).length),esc(it.notes),esc(i===0?b.total_cogs:""),esc(i===0?b.total_revenue:""),esc(i===0?b.gross_margin_pct:"")].join(","));});
     const bl=new Blob([l.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download=`WES_${b.mode||"walkthrough"}_${b.id||"export"}.csv`;a.click();
   };
 
@@ -716,10 +740,17 @@ export default function Walkthrough() {
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Year</label><input style={inpSm} type="number" value={it.yearMfg||""} onChange={e=>uItem(i,"yearMfg",e.target.value)} placeholder="2001"/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>In/Out</label><div style={{display:"flex",gap:3}}>{[{v:"indoor",l:"In"},{v:"outdoor",l:"Out"}].map(o=><button key={o.v} onClick={()=>uItem(i,"indoorOutdoor",o.v)} style={{flex:1,padding:"8px 0",borderRadius:6,border:`2px solid ${it.indoorOutdoor===o.v?"#2563eb":"#e2e8f0"}`,background:it.indoorOutdoor===o.v?"#2563eb15":"#fff",color:it.indoorOutdoor===o.v?"#2563eb":"#cbd5e1",fontWeight:700,fontSize:11,cursor:"pointer"}}>{o.l}</button>)}</div></div>
             </div>
-            {/* Specs row 3: transformer/breaker specific */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
-              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>KVA</label><input style={inpSm} value={it.kvaRating||""} onChange={e=>uItem(i,"kvaRating",e.target.value)} placeholder="N/A"/></div>
-              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Winding</label><select style={inpSm} value={it.windingMaterial||""} onChange={e=>uItem(i,"windingMaterial",e.target.value)}>{WINDING.map(w=><option key={w.v} value={w.v}>{w.l}</option>)}</select></div>
+            {/* Specs row 3: transformer specific */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>KVA</label><input style={inpSm} value={it.kvaRating||""} onChange={e=>uItem(i,"kvaRating",e.target.value)} placeholder="Cont."/></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>KVA FA</label><input style={inpSm} value={it.kvaForced||""} onChange={e=>uItem(i,"kvaForced",e.target.value)} placeholder="Forced"/></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Class</label><select style={inpSm} value={it.coolingClass||""} onChange={e=>uItem(i,"coolingClass",e.target.value)}><option value="">--</option><option value="OA">OA (Oil)</option><option value="OA/FA">OA/FA</option><option value="OA/FA/FA">OA/FA/FA</option><option value="AA">AA (Dry)</option><option value="AA/FA">AA/FA</option><option value="AFA">AFA</option></select></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Liquid</label><select style={inpSm} value={it.liquidType||""} onChange={e=>uItem(i,"liquidType",e.target.value)}><option value="">--</option><option value="OIL">Oil</option><option value="DRY">Dry</option><option value="SILICONE">Silicone</option></select></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>HV Wind</label><select style={inpSm} value={it.windingHv||""} onChange={e=>{uItem(i,"windingHv",e.target.value);uItem(i,"windingMaterial",e.target.value&&it.windingLv?(e.target.value===it.windingLv?e.target.value:`${e.target.value}/${it.windingLv}`):e.target.value);}}><option value="">--</option><option value="CU">Copper</option><option value="AL">Aluminum</option></select></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>LV Wind</label><select style={inpSm} value={it.windingLv||""} onChange={e=>{uItem(i,"windingLv",e.target.value);uItem(i,"windingMaterial",it.windingHv&&e.target.value?(it.windingHv===e.target.value?e.target.value:`${it.windingHv}/${e.target.value}`):e.target.value);}}><option value="">--</option><option value="CU">Copper</option><option value="AL">Aluminum</option></select></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Wt (lbs)</label><input style={inpSm} type="number" value={it.nameplateWeight||""} onChange={e=>uItem(i,"nameplateWeight",e.target.value)} placeholder="Total"/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>kAIC</label><input style={inpSm} value={it.interruptRating||""} onChange={e=>uItem(i,"interruptRating",e.target.value)} placeholder="N/A"/></div>
             </div>
 
