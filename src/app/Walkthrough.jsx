@@ -20,6 +20,9 @@ const dc={};DISP.forEach(d=>dc[d.v]=d.c);
 const LOC=[{v:"job_site",l:"Job Site"},{v:"main_warehouse",l:"Main WH"},{v:"satellite_1",l:"Sat WH 1"},{v:"satellite_2",l:"Sat WH 2"},{v:"off_site",l:"Off-Site"},{v:"scrap_yard",l:"Scrap Yard"}];
 const AMPS=["15","20","25","30","40","50","60","70","80","100","125","150","200","225","250","300","350","400","600","800","1000","1200","1600","2000","2500","3000","4000"];
 const MT=["Breaker","Cover/Door","Bus Bar","Lug","Fuse","Relay","Wiring","Nameplate","Hardware","Fan","Arc Chute","Trip Unit","Other"];
+const NEMA=[{v:"1",d:"Indoor General"},{v:"3R",d:"Outdoor Rain"},{v:"3",d:"Outdoor Windblown"},{v:"4",d:"Watertight"},{v:"4X",d:"Corrosion Resist"},{v:"12",d:"Dust-tight"},{v:"13",d:"Oil-tight"}];
+const PHASE=["1","3"];
+const WINDING=[{v:"",l:"N/A"},{v:"CU",l:"Copper"},{v:"AL",l:"Aluminum"}];
 const today=()=>new Date().toISOString().slice(0,10);
 
 /* ── Styles ─────────────────────────────────────────────── */
@@ -146,6 +149,7 @@ export default function Walkthrough() {
   const addItem=()=>setItems(p=>[...p,{
     equipmentType:"",manufacturer:"",modelNumber:"",serialNumber:"",
     voltageRating:"",amperageRating:"",quantity:1,grade:"C",
+    nemaRating:"",indoorOutdoor:"indoor",yearMfg:"",phase:"3",kvaRating:"",windingMaterial:"",interruptRating:"",
     disposition:"unassigned",estimatedResale:0,estimatedScrap:0,
     ebayCompAvg:0,priceBookValue:0,estimatedWeight:0,
     conditionNotes:"",photos:[],missing:[],breakers:[],
@@ -214,8 +218,8 @@ export default function Walkthrough() {
     msg+=`*EQUIPMENT (${its.length} items):*\n`;
     its.forEach((it,i)=>{
       msg+=`${i+1}. ${it.equipmentType||it.equipment_type} ${it.manufacturer||""}\n`;
-      msg+=`   ${it.amperageRating||it.amperage_rating||""}A ${it.voltageRating||it.voltage_rating||""}V\n`;
-      msg+=`   S/N: ${it.serialNumber||it.serial_number||"N/A"}\n`;
+      msg+=`   ${it.amperageRating||it.amperage_rating||""}A ${it.voltageRating||it.voltage_rating||""}V${it.kvaRating||it.kva_rating?` ${it.kvaRating||it.kva_rating}KVA`:""} ${it.phase||"3"}PH\n`;
+      msg+=`   S/N: ${it.serialNumber||it.serial_number||"N/A"}${it.nemaRating||it.nema_rating?` | NEMA ${it.nemaRating||it.nema_rating}`:""}${it.indoorOutdoor||it.indoor_outdoor?` | ${(it.indoorOutdoor||it.indoor_outdoor||"").toUpperCase()}`:""}${it.yearMfg||it.year_manufactured?` | Yr: ${it.yearMfg||it.year_manufactured}`:""}\n`;
       msg+=`   Grade: ${it.grade} | ${it.disposition}\n`;
       if(it.disposition!=="scrap")msg+=`   Est Value: $${parseFloat(it.estimatedResale||it.estimated_resale||0).toFixed(0)}\n`;
       else msg+=`   Scrap: $${parseFloat(it.estimatedScrap||it.estimated_scrap||0).toFixed(0)}\n`;
@@ -285,6 +289,13 @@ export default function Walkthrough() {
           refurb_cost:it.refurbCost?parseFloat(it.refurbCost):null,
           total_cogs:((parseFloat(it.acquisitionCost)||0)+(parseFloat(it.refurbCost)||0))||null,
           asking_price:it.askingPrice?parseFloat(it.askingPrice):null,
+          nema_rating:it.nemaRating||null,
+          indoor_outdoor:it.indoorOutdoor||"indoor",
+          year_manufactured:it.yearMfg?parseInt(it.yearMfg):null,
+          phase:it.phase||"3",
+          kva_rating:it.kvaRating||null,
+          winding_material:it.windingMaterial||null,
+          interrupting_rating:it.interruptRating||null,
         };
 
         let ok=false;
@@ -327,7 +338,7 @@ export default function Walkthrough() {
       const bkrDetail=bkrs.map(b=>`${b.count}x ${b.amp}A ${b.poles}P ${b.grade} ${b.oem}${b.pitting?" PITTING":""}${b.contactWear?" WEAR":""}`).join("; ");
       const condNotes=[it.conditionNotes,bkrDetail?`Breakers: ${bkrDetail}`:""].filter(Boolean).join(" | ");
       return {
-      bid_id:id,equipment_type:it.equipmentType,manufacturer:it.manufacturer||null,model_number:it.modelNumber||null,serial_number:it.serialNumber||null,voltage_rating:it.voltageRating||null,amperage_rating:it.amperageRating||null,quantity:it.quantity,grade:it.grade,disposition:it.disposition,estimated_resale:parseFloat(it.estimatedResale)||null,estimated_scrap:it.estimatedScrap||null,ebay_comp_avg:it.ebayCompAvg||null,price_book_value:it.priceBookValue||null,estimated_weight_lbs:it.estimatedWeight||null,breaker_count:bkrCount||null,breaker_value:null,notes:condNotes||null,sort_order:i,photo_count:(it.photos||[]).length,pickup_status:it.pickupStatus||"pending",destination:it.destination||null,
+      bid_id:id,equipment_type:it.equipmentType,manufacturer:it.manufacturer||null,model_number:it.modelNumber||null,serial_number:it.serialNumber||null,voltage_rating:it.voltageRating||null,amperage_rating:it.amperageRating||null,quantity:it.quantity,grade:it.grade,disposition:it.disposition,estimated_resale:parseFloat(it.estimatedResale)||null,estimated_scrap:it.estimatedScrap||null,ebay_comp_avg:it.ebayCompAvg||null,price_book_value:it.priceBookValue||null,estimated_weight_lbs:it.estimatedWeight||null,breaker_count:bkrCount||null,breaker_value:null,notes:condNotes||null,sort_order:i,photo_count:(it.photos||[]).length,pickup_status:it.pickupStatus||"pending",destination:it.destination||null,nema_rating:it.nemaRating||null,indoor_outdoor:it.indoorOutdoor||"indoor",year_manufactured:it.yearMfg?parseInt(it.yearMfg):null,phase:it.phase||"3",kva_rating:it.kvaRating||null,winding_material:it.windingMaterial||null,interrupting_rating:it.interruptRating||null,
     };});
     try{
       let ok=false;
@@ -379,6 +390,13 @@ export default function Walkthrough() {
       scanned_by:jobData.prepared_by||jobData.preparedBy||null,
       qc_inspection_id:null,
       acquisition_cost:jobData.total_cogs?parseFloat(jobData.total_cogs)/(jobData.items||jobData.bid_line_items||[]).length:null,
+      nema_rating:lineItem.nema_rating||lineItem.nemaRating||null,
+      indoor_outdoor:lineItem.indoor_outdoor||lineItem.indoorOutdoor||"indoor",
+      year_manufactured:lineItem.year_manufactured||lineItem.yearMfg?parseInt(lineItem.year_manufactured||lineItem.yearMfg):null,
+      phase:lineItem.phase||"3",
+      kva_rating:lineItem.kva_rating||lineItem.kvaRating||null,
+      winding_material:lineItem.winding_material||lineItem.windingMaterial||null,
+      interrupting_rating:lineItem.interrupting_rating||lineItem.interruptRating||null,
     };
 
     // Parse breaker data from notes for subcomponents
@@ -462,9 +480,9 @@ export default function Walkthrough() {
   const esc=v=>{const s=String(v??"");return s.includes(",")||s.includes('"')?`"${s.replace(/"/g,'""')}"`:s;};
   const exportCSV=(b)=>{
     const its=b.items||b.bid_line_items||[];
-    const h=["ID","Job","Customer","Date","Mode","Equipment","Mfr","S/N","Amps","Volts","Grade","Disposition","Dest","Qty","Resale $","Scrap $","eBay Avg","Photos","Missing","Condition","COGS","Revenue","Margin %"];
+    const h=["ID","Job","Customer","Date","Mode","Equipment","Mfr","S/N","Amps","Volts","KVA","Phase","NEMA","In/Out","Year","Winding","kAIC","Grade","Disposition","Dest","Qty","Resale $","Scrap $","eBay Avg","Photos","Condition","COGS","Revenue","Margin %"];
     const l=[h.map(esc).join(",")];
-    its.forEach((it,i)=>{l.push([esc(b.id),esc(b.job_name),esc(b.customer_name),esc(b.bid_date),esc(b.mode),esc(it.equipment_type),esc(it.manufacturer),esc(it.serial_number),esc(it.amperage_rating),esc(it.voltage_rating),esc(it.grade),esc(it.disposition),esc(it.destination),esc(it.quantity),esc(it.estimated_resale),esc(it.estimated_scrap),esc(it.ebay_comp_avg),esc(it.photo_count||(it.photos||[]).length),esc(""),esc(it.notes),esc(i===0?b.total_cogs:""),esc(i===0?b.total_revenue:""),esc(i===0?b.gross_margin_pct:"")].join(","));});
+    its.forEach((it,i)=>{l.push([esc(b.id),esc(b.job_name),esc(b.customer_name),esc(b.bid_date),esc(b.mode),esc(it.equipment_type),esc(it.manufacturer),esc(it.serial_number),esc(it.amperage_rating),esc(it.voltage_rating),esc(it.kva_rating),esc(it.phase),esc(it.nema_rating),esc(it.indoor_outdoor),esc(it.year_manufactured),esc(it.winding_material),esc(it.interrupting_rating),esc(it.grade),esc(it.disposition),esc(it.destination),esc(it.quantity),esc(it.estimated_resale),esc(it.estimated_scrap),esc(it.ebay_comp_avg),esc(it.photo_count||(it.photos||[]).length),esc(it.notes),esc(i===0?b.total_cogs:""),esc(i===0?b.total_revenue:""),esc(i===0?b.gross_margin_pct:"")].join(","));});
     const bl=new Blob([l.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download=`WES_${b.mode||"walkthrough"}_${b.id||"export"}.csv`;a.click();
   };
 
@@ -571,6 +589,20 @@ export default function Walkthrough() {
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Model</label><input style={inpSm} value={it.modelNumber} onChange={e=>uItem(i,"modelNumber",e.target.value)}/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Amps</label><input style={inpSm} value={it.amperageRating} onChange={e=>uItem(i,"amperageRating",e.target.value)}/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Volts</label><input style={inpSm} value={it.voltageRating} onChange={e=>uItem(i,"voltageRating",e.target.value)}/></div>
+            </div>
+
+            {/* Specs row 2 */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>NEMA</label><select style={inpSm} value={it.nemaRating||""} onChange={e=>uItem(i,"nemaRating",e.target.value)}><option value="">--</option>{NEMA.map(n=><option key={n.v} value={n.v}>{n.v}</option>)}</select></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Phase</label><div style={{display:"flex",gap:3}}>{PHASE.map(p=><button key={p} onClick={()=>uItem(i,"phase",p)} style={{flex:1,padding:"8px 0",borderRadius:6,border:`2px solid ${it.phase===p?"#2563eb":"#e2e8f0"}`,background:it.phase===p?"#2563eb15":"#fff",color:it.phase===p?"#2563eb":"#cbd5e1",fontWeight:800,fontSize:12,cursor:"pointer"}}>{p}P</button>)}</div></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Year</label><input style={inpSm} type="number" value={it.yearMfg||""} onChange={e=>uItem(i,"yearMfg",e.target.value)} placeholder="2001"/></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>In/Out</label><div style={{display:"flex",gap:3}}>{[{v:"indoor",l:"In"},{v:"outdoor",l:"Out"}].map(o=><button key={o.v} onClick={()=>uItem(i,"indoorOutdoor",o.v)} style={{flex:1,padding:"8px 0",borderRadius:6,border:`2px solid ${it.indoorOutdoor===o.v?"#2563eb":"#e2e8f0"}`,background:it.indoorOutdoor===o.v?"#2563eb15":"#fff",color:it.indoorOutdoor===o.v?"#2563eb":"#cbd5e1",fontWeight:700,fontSize:11,cursor:"pointer"}}>{o.l}</button>)}</div></div>
+            </div>
+            {/* Specs row 3: transformer/breaker specific */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>KVA</label><input style={inpSm} value={it.kvaRating||""} onChange={e=>uItem(i,"kvaRating",e.target.value)} placeholder="N/A"/></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Winding</label><select style={inpSm} value={it.windingMaterial||""} onChange={e=>uItem(i,"windingMaterial",e.target.value)}>{WINDING.map(w=><option key={w.v} value={w.v}>{w.l}</option>)}</select></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>kAIC</label><input style={inpSm} value={it.interruptRating||""} onChange={e=>uItem(i,"interruptRating",e.target.value)} placeholder="N/A"/></div>
             </div>
 
             {/* Grade */}
@@ -723,7 +755,7 @@ export default function Walkthrough() {
                   return(
                   <div key={j} style={{padding:"10px 0",borderBottom:"1px solid #f1f5f9",fontSize:12}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                      <div><span style={{fontWeight:600}}>{it.equipment_type}</span>{it.manufacturer&&<span style={{color:"#94a3b8",marginLeft:4}}>{it.manufacturer}</span>}{it.amperage_rating&&<span style={{marginLeft:4}}>{it.amperage_rating}A</span>}<span style={{marginLeft:4,padding:"1px 5px",borderRadius:4,background:(gc[it.grade]||"#6b7280")+"18",color:gc[it.grade],fontSize:10,fontWeight:700}}>{it.grade}</span>{it.breaker_count>0&&<span style={{marginLeft:4,padding:"1px 5px",borderRadius:4,background:"#0369a118",color:"#0369a1",fontSize:10,fontWeight:600}}>{it.breaker_count} bkrs</span>}</div>
+                      <div><span style={{fontWeight:600}}>{it.equipment_type}</span>{it.manufacturer&&<span style={{color:"#94a3b8",marginLeft:4}}>{it.manufacturer}</span>}{it.amperage_rating&&<span style={{marginLeft:4}}>{it.amperage_rating}A</span>}{it.kva_rating&&<span style={{marginLeft:4,color:"#475569"}}>{it.kva_rating}KVA</span>}<span style={{marginLeft:4,padding:"1px 5px",borderRadius:4,background:(gc[it.grade]||"#6b7280")+"18",color:gc[it.grade],fontSize:10,fontWeight:700}}>{it.grade}</span>{it.nema_rating&&<span style={{marginLeft:4,padding:"1px 5px",borderRadius:4,background:"#6366f118",color:"#6366f1",fontSize:9,fontWeight:600}}>NEMA {it.nema_rating}</span>}{it.winding_material&&<span style={{marginLeft:4,padding:"1px 5px",borderRadius:4,background:it.winding_material==="CU"?"#f59e0b18":"#6b728018",color:it.winding_material==="CU"?"#f59e0b":"#6b7280",fontSize:9,fontWeight:600}}>{it.winding_material}</span>}{it.breaker_count>0&&<span style={{marginLeft:4,padding:"1px 5px",borderRadius:4,background:"#0369a118",color:"#0369a1",fontSize:10,fontWeight:600}}>{it.breaker_count} bkrs</span>}</div>
                       <span style={{fontWeight:700,whiteSpace:"nowrap"}}>${parseFloat(it.disposition==="scrap"?it.estimated_scrap:it.estimated_resale||0).toFixed(0)}</span>
                     </div>
                     {/* Editable disposition */}
