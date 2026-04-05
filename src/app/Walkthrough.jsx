@@ -214,6 +214,20 @@ export default function Walkthrough() {
         coolingClass:cooling||it.coolingClass,
         liquidType:liquid||it.liquidType,
         nameplateWeight:npWeight||it.nameplateWeight,
+        frameSize:p.frame_size||it.frameSize,
+        tripRating:p.trip_rating||it.tripRating,
+        breakerType:p.breaker_type||it.breakerType,
+        tripUnitType:p.trip_unit_type||it.tripUnitType,
+        mountingType:p.mounting_type||it.mountingType,
+        catalogNumber:p.catalog_number||it.catalogNumber,
+        interruptRating:p.interrupting_rating||it.interruptRating,
+        busRating:p.bus_rating||it.busRating,
+        shortCircuitRating:p.short_circuit_rating||it.shortCircuitRating,
+        bilKv:p.bil_kv||it.bilKv,
+        voltageClass:p.voltage_class||it.voltageClass,
+        numSections:p.num_sections||it.numSections,
+        busMaterial:p.bus_material||it.busMaterial,
+        switchgearType:p.switchgear_type||it.switchgearType,
       }:it));
       setMsg({t:"success",m:"Nameplate scanned."});
     }catch(e){setMsg({t:"error",m:"Scan failed: "+e.message});}
@@ -232,6 +246,8 @@ export default function Walkthrough() {
     equipmentType:"",manufacturer:"",modelNumber:"",serialNumber:"",
     voltageRating:"",amperageRating:"",quantity:1,grade:"C",
     nemaRating:"",indoorOutdoor:"indoor",yearMfg:"",phase:"3",kvaRating:"",kvaForced:"",windingMaterial:"",windingHv:"",windingLv:"",interruptRating:"",coolingClass:"",liquidType:"",nameplateWeight:"",
+    frameSize:"",tripRating:"",breakerType:"",tripUnitType:"",mountingType:"",catalogNumber:"",
+    busRating:"",shortCircuitRating:"",bilKv:"",voltageClass:"",numSections:"",busMaterial:"",switchgearType:"",
     disposition:"unassigned",estimatedResale:0,estimatedScrap:0,
     ebayCompAvg:0,priceBookValue:0,estimatedWeight:0,
     conditionNotes:"",photos:[],missing:[],breakers:[],
@@ -387,6 +403,7 @@ export default function Walkthrough() {
           liquid_type:it.liquidType||null,
           nameplate_weight_lbs:it.nameplateWeight?parseFloat(it.nameplateWeight):null,
           interrupting_rating:it.interruptRating||null,
+          frame_size:it.frameSize||null,trip_rating:it.tripRating||null,breaker_type:it.breakerType||null,trip_unit_type:it.tripUnitType||null,mounting_type:it.mountingType||null,catalog_number:it.catalogNumber||null,bus_rating:it.busRating||null,short_circuit_rating:it.shortCircuitRating||null,bil_kv:it.bilKv||null,voltage_class:it.voltageClass||null,num_sections:it.numSections?parseInt(it.numSections):null,bus_material:it.busMaterial||null,switchgear_type:it.switchgearType||null,
           barcode_sku:it.barcodeSku||null,
           putaway_location:it.putawayLocation||null,
           received_verified:true,verified_by:job.preparedBy||null,verified_date:job.bidDate||today(),
@@ -432,7 +449,7 @@ export default function Walkthrough() {
       const bkrDetail=bkrs.map(b=>`${b.count}x ${b.amp}A ${b.poles}P ${b.grade} ${b.oem}${b.pitting?" PITTING":""}${b.contactWear?" WEAR":""}`).join("; ");
       const condNotes=[it.conditionNotes,bkrDetail?`Breakers: ${bkrDetail}`:""].filter(Boolean).join(" | ");
       return {
-      bid_id:id,equipment_type:it.equipmentType,manufacturer:it.manufacturer||null,model_number:it.modelNumber||null,serial_number:it.serialNumber||null,voltage_rating:it.voltageRating||null,amperage_rating:it.amperageRating||null,quantity:it.quantity,grade:it.grade,disposition:it.disposition,estimated_resale:parseFloat(it.estimatedResale)||null,estimated_scrap:it.estimatedScrap||null,ebay_comp_avg:it.ebayCompAvg||null,price_book_value:it.priceBookValue||null,estimated_weight_lbs:it.nameplateWeight?parseFloat(it.nameplateWeight):(it.estimatedWeight||null),breaker_count:bkrCount||null,breaker_value:null,notes:condNotes||null,sort_order:i,photo_count:(it.photos||[]).length,pickup_status:it.pickupStatus||"pending",destination:it.destination||null,nema_rating:it.nemaRating||null,indoor_outdoor:it.indoorOutdoor||"indoor",year_manufactured:it.yearMfg?parseInt(it.yearMfg):null,phase:it.phase||"3",kva_rating:it.kvaRating||null,kva_forced:it.kvaForced||null,winding_material:it.windingMaterial||null,winding_hv:it.windingHv||null,winding_lv:it.windingLv||null,cooling_class:it.coolingClass||null,liquid_type:it.liquidType||null,nameplate_weight_lbs:it.nameplateWeight?parseFloat(it.nameplateWeight):null,interrupting_rating:it.interruptRating||null,
+      bid_id:id,equipment_type:it.equipmentType,manufacturer:it.manufacturer||null,model_number:it.modelNumber||null,serial_number:it.serialNumber||null,voltage_rating:it.voltageRating||null,amperage_rating:it.amperageRating||null,quantity:it.quantity,grade:it.grade,disposition:it.disposition,estimated_resale:parseFloat(it.estimatedResale)||null,estimated_scrap:it.estimatedScrap||null,ebay_comp_avg:it.ebayCompAvg||null,price_book_value:it.priceBookValue||null,estimated_weight_lbs:it.nameplateWeight?parseFloat(it.nameplateWeight):(it.estimatedWeight||null),breaker_count:bkrCount||null,breaker_value:null,notes:condNotes||null,sort_order:i,photo_count:(it.photos||[]).length,pickup_status:it.pickupStatus||"pending",destination:it.destination||null,nema_rating:it.nemaRating||null,indoor_outdoor:it.indoorOutdoor||"indoor",year_manufactured:it.yearMfg?parseInt(it.yearMfg):null,phase:it.phase||"3",kva_rating:it.kvaRating||null,kva_forced:it.kvaForced||null,winding_material:it.windingMaterial||null,winding_hv:it.windingHv||null,winding_lv:it.windingLv||null,cooling_class:it.coolingClass||null,liquid_type:it.liquidType||null,nameplate_weight_lbs:it.nameplateWeight?parseFloat(it.nameplateWeight):null,interrupting_rating:it.interruptRating||null,frame_size:it.frameSize||null,trip_rating:it.tripRating||null,breaker_type:it.breakerType||null,trip_unit_type:it.tripUnitType||null,mounting_type:it.mountingType||null,catalog_number:it.catalogNumber||null,bus_rating:it.busRating||null,short_circuit_rating:it.shortCircuitRating||null,bil_kv:it.bilKv||null,voltage_class:it.voltageClass||null,num_sections:it.numSections?parseInt(it.numSections):null,bus_material:it.busMaterial||null,switchgear_type:it.switchgearType||null,
     };});
     try{
       let ok=false;
@@ -497,6 +514,19 @@ export default function Walkthrough() {
       liquid_type:lineItem.liquid_type||lineItem.liquidType||null,
       nameplate_weight_lbs:lineItem.nameplate_weight_lbs||lineItem.nameplateWeight?parseFloat(lineItem.nameplate_weight_lbs||lineItem.nameplateWeight):null,
       interrupting_rating:lineItem.interrupting_rating||lineItem.interruptRating||null,
+      frame_size:lineItem.frame_size||lineItem.frameSize||null,
+      trip_rating:lineItem.trip_rating||lineItem.tripRating||null,
+      breaker_type:lineItem.breaker_type||lineItem.breakerType||null,
+      trip_unit_type:lineItem.trip_unit_type||lineItem.tripUnitType||null,
+      mounting_type:lineItem.mounting_type||lineItem.mountingType||null,
+      catalog_number:lineItem.catalog_number||lineItem.catalogNumber||null,
+      bus_rating:lineItem.bus_rating||lineItem.busRating||null,
+      short_circuit_rating:lineItem.short_circuit_rating||lineItem.shortCircuitRating||null,
+      bil_kv:lineItem.bil_kv||lineItem.bilKv||null,
+      voltage_class:lineItem.voltage_class||lineItem.voltageClass||null,
+      num_sections:lineItem.num_sections||lineItem.numSections?parseInt(lineItem.num_sections||lineItem.numSections):null,
+      bus_material:lineItem.bus_material||lineItem.busMaterial||null,
+      switchgear_type:lineItem.switchgear_type||lineItem.switchgearType||null,
     };
 
     // Parse breaker data from notes for subcomponents
@@ -752,6 +782,29 @@ export default function Walkthrough() {
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>LV Wind</label><select style={inpSm} value={it.windingLv||""} onChange={e=>{uItem(i,"windingLv",e.target.value);uItem(i,"windingMaterial",it.windingHv&&e.target.value?(it.windingHv===e.target.value?e.target.value:`${it.windingHv}/${e.target.value}`):e.target.value);}}><option value="">--</option><option value="CU">Copper</option><option value="AL">Aluminum</option></select></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Wt (lbs)</label><input style={inpSm} type="number" value={it.nameplateWeight||""} onChange={e=>uItem(i,"nameplateWeight",e.target.value)} placeholder="Total"/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>kAIC</label><input style={inpSm} value={it.interruptRating||""} onChange={e=>uItem(i,"interruptRating",e.target.value)} placeholder="N/A"/></div>
+            </div>
+            {/* Breaker-specific fields */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Frame</label><input style={inpSm} value={it.frameSize||""} onChange={e=>uItem(i,"frameSize",e.target.value)} placeholder="800A"/></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Trip</label><input style={inpSm} value={it.tripRating||""} onChange={e=>uItem(i,"tripRating",e.target.value)} placeholder="Sensor"/></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Cat #</label><input style={inpSm} value={it.catalogNumber||""} onChange={e=>uItem(i,"catalogNumber",e.target.value)} placeholder="Catalog"/></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Mount</label><select style={inpSm} value={it.mountingType||""} onChange={e=>uItem(i,"mountingType",e.target.value)}><option value="">--</option><option value="fixed">Fixed</option><option value="drawout">Drawout</option><option value="plug-in">Plug-in</option></select></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Breaker Type</label><select style={inpSm} value={it.breakerType||""} onChange={e=>uItem(i,"breakerType",e.target.value)}><option value="">--</option><option value="molded_case">Molded Case (MCCB)</option><option value="power">Power (LVPCB)</option><option value="air">Air (ACB)</option><option value="vacuum">Vacuum (VCB)</option><option value="insulated_case">Insulated Case (ICCB)</option></select></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Trip Unit</label><select style={inpSm} value={it.tripUnitType||""} onChange={e=>uItem(i,"tripUnitType",e.target.value)}><option value="">--</option><option value="thermal_magnetic">Thermal-Magnetic</option><option value="electronic">Electronic</option><option value="LSI">LSI</option><option value="LSIG">LSIG</option><option value="MicroLogic">MicroLogic</option><option value="Digitrip">Digitrip</option></select></div>
+            </div>
+            {/* Switchgear-specific fields */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Bus Amps</label><input style={inpSm} value={it.busRating||""} onChange={e=>uItem(i,"busRating",e.target.value)} placeholder="2000"/></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>SC kA</label><input style={inpSm} value={it.shortCircuitRating||""} onChange={e=>uItem(i,"shortCircuitRating",e.target.value)} placeholder="65kA"/></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>BIL kV</label><input style={inpSm} value={it.bilKv||""} onChange={e=>uItem(i,"bilKv",e.target.value)} placeholder="95"/></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Sections</label><input style={inpSm} type="number" value={it.numSections||""} onChange={e=>uItem(i,"numSections",e.target.value)} placeholder="#"/></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>V Class</label><select style={inpSm} value={it.voltageClass||""} onChange={e=>uItem(i,"voltageClass",e.target.value)}><option value="">--</option><option value="LV">LV (600V-)</option><option value="5kV">MV 5kV</option><option value="15kV">MV 15kV</option><option value="27kV">MV 27kV</option><option value="38kV">MV 38kV</option></select></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Bus Metal</label><select style={inpSm} value={it.busMaterial||""} onChange={e=>uItem(i,"busMaterial",e.target.value)}><option value="">--</option><option value="CU">Copper</option><option value="AL">Aluminum</option></select></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Type</label><select style={inpSm} value={it.switchgearType||""} onChange={e=>uItem(i,"switchgearType",e.target.value)}><option value="">--</option><option value="metal-clad">Metal-Clad</option><option value="metal-enclosed">Metal-Enclosed</option><option value="dead-front">Dead-Front</option><option value="arc-resistant">Arc-Resistant</option></select></div>
             </div>
 
             {/* Grade */}
