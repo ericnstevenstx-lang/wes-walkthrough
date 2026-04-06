@@ -11,8 +11,8 @@ async function sG(k){try{if(typeof window!=="undefined"&&window.storage){const r
 async function sS(k,v){try{if(typeof window!=="undefined"&&window.storage)await window.storage.set(k,JSON.stringify(v));}catch{}}
 
 /* ── Constants ─────────────────────────────────────────── */
-const EQ=["Switchgear","Panelboard","Transformer","Circuit Breaker","Motor Control Center (MCC)","Bus Duct","Disconnect Switch","UPS System","PDU","RPP (Remote Power Panel)","ATS / Transfer Switch","Other"];
-const MFR=["Eaton / Cutler-Hammer","Siemens","Square D / Schneider","ABB","GE","Westinghouse","ITE","Federal Pacific","Liebert / Vertiv","APC / Schneider","Other"];
+const EQ=["Switchgear","Panelboard","Transformer","Circuit Breaker","Motor Control Center (MCC)","Bus Duct","Disconnect Switch","UPS System","PDU","RPP (Remote Power Panel)","ATS / Transfer Switch","VFD / Drive","Motor Starter","Control Transformer","Trip Unit","Relay","CT / PT","Meter","Other"];
+const MFR=["Eaton / Cutler-Hammer","Siemens","Square D / Schneider","ABB","GE","Westinghouse","ITE","Federal Pacific","Allen-Bradley / Rockwell","Mitsubishi","Yaskawa","Danfoss","Liebert / Vertiv","APC / Schneider","ABL Sursum","Other"];
 const GRD=[{v:"A",c:"#16a34a",d:"Excellent"},{v:"B",c:"#2563eb",d:"Good"},{v:"C",c:"#f59e0b",d:"Fair"},{v:"D",c:"#dc2626",d:"Scrap"}];
 const gc={};GRD.forEach(g=>gc[g.v]=g.c);
 const DISP=[{v:"unassigned",l:"Unassigned",c:"#6b7280"},{v:"resale",l:"Resale",c:"#2563eb"},{v:"deman",l:"Deman",c:"#8b5cf6"},{v:"ebay",l:"eBay",c:"#16a34a"},{v:"skid",l:"Skid Build",c:"#0891b2"},{v:"scrap",l:"Scrap",c:"#dc2626"}];
@@ -31,6 +31,17 @@ const inpE={...inp,borderColor:"#ef4444"};
 const inpSm={...inp,fontSize:14,padding:"10px 12px"};
 const lbl={display:"block",fontSize:13,fontWeight:700,color:"#475569",marginBottom:4};
 const card={background:"#fff",borderRadius:14,padding:16,marginBottom:12,boxShadow:"0 1px 3px rgba(0,0,0,0.06)"};
+
+/* ── Collapsible section ── */
+function Section({title,children,badge,defaultOpen=false,color="#475569"}){
+  const [open,setOpen]=useState(defaultOpen);
+  return(<div style={{marginBottom:8}}>
+    <button onClick={()=>setOpen(!open)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #e5e7eb",background:open?"#f8fafc":"#fff",cursor:"pointer",fontFamily:"inherit"}}>
+      <span style={{fontSize:11,fontWeight:700,color}}>{open?"▾":"▸"} {title}{badge?` (${badge})`:""}</span>
+    </button>
+    {open&&<div style={{padding:"8px 0 0"}}>{children}</div>}
+  </div>);
+}
 
 /* ── Photo compression ─────────────────────────────────── */
 function compressImage(file,maxW=1200,quality=0.7){
@@ -113,6 +124,32 @@ export default function Walkthrough() {
   const [priceBook,setPriceBook]=useState([]);
   const [weights,setWeights]=useState([]);
   const [scrapPrices,setScrapPrices]=useState(null);
+  const [expandedItems,setExpandedItems]=useState({});
+  const toggleItem=(i)=>setExpandedItems(p=>({...p,[i]:!p[i]}));
+
+  /* ── Inventory browse state ── */
+  const [inv,setInv]=useState([]);
+  const [invLoading,setInvLoading]=useState(false);
+  const [invSearch,setInvSearch]=useState("");
+  const [invFilterType,setInvFilterType]=useState("");
+  const [invFilterGrade,setInvFilterGrade]=useState("");
+  const [invFilterLoc,setInvFilterLoc]=useState("");
+  const [invSort,setInvSort]=useState("date_desc");
+  const [invExpId,setInvExpId]=useState(null);
+
+  const loadInventory=useCallback(async()=>{
+    setInvLoading(true);
+    try{
+      if(!loc){
+        const data=await dbF("inventory_items?select=*&order=created_at.desc&limit=200");
+        if(data)setInv(data);
+      }else{
+        const local=await sG("wes_inventory");
+        if(local)setInv(local);
+      }
+    }catch{}
+    setInvLoading(false);
+  },[]);
 
   /* ── Job form ── */
   const [job,setJob]=useState({
@@ -238,7 +275,15 @@ export default function Walkthrough() {
   const addPhoto=async(file,idx)=>{
     if(!file)return;
     const compressed=await compressImage(file);
-    setItems(prev=>prev.map((it,i)=>i===idx?{...it,photos:[...(it.photos||[]),compressed]}:it));
+    // Upload to Supabase Storage
+    let photoUrl=compressed;
+    try{
+      const blob=await(await fetch(compressed)).blob();
+      const fname=`${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
+      const upResp=await fetch(`${SB}/storage/v1/object/item-photos/${fname}`,{method:"POST",headers:{apikey:SK,Authorization:`Bearer ${SK}`,"Content-Type":"image/jpeg"},body:blob});
+      if(upResp.ok)photoUrl=`${SB}/storage/v1/object/public/item-photos/${fname}`;
+    }catch{}
+    setItems(prev=>prev.map((it,i)=>i===idx?{...it,photos:[...(it.photos||[]),photoUrl]}:it));
   };
 
   /* ── Item management ── */
@@ -286,14 +331,34 @@ export default function Walkthrough() {
   /* ── eBay comp lookup ── */
   const fetchEbay=async(idx)=>{
     const item=items[idx];
-    const q=`${item.manufacturer||""} ${item.equipmentType} ${item.amperageRating?item.amperageRating+"A":""} used`.trim();
-    setMsg({t:"info",m:`Searching eBay...`});
+    // Build smart query based on equipment type and available data
+    let q="";
+    const cat=item.catalogNumber||"";
+    const mfr=item.manufacturer||"";
+    const typ=item.equipmentType||"";
+    const isXfmr=typ.toLowerCase().includes("transformer");
+    const isBkr=typ.toLowerCase().includes("breaker")||typ.toLowerCase().includes("disconnect");
+    
+    if(cat){
+      // Catalog number is the most precise search term
+      q=cat;
+    }else if(isXfmr){
+      q=`${mfr} ${item.kvaRating?item.kvaRating+"KVA":""} transformer ${item.voltageRating||""}`.trim();
+    }else if(isBkr){
+      q=`${mfr} ${item.frameSize?item.frameSize+"A frame":""}${item.amperageRating?item.amperageRating+"A":""} ${item.interruptRating?item.interruptRating+"kAIC":""} circuit breaker`.trim();
+    }else{
+      q=`${mfr} ${typ} ${item.amperageRating?item.amperageRating+"A":""} ${item.voltageRating?item.voltageRating+"V":""}`.trim();
+    }
+    q=q.replace(/\s+/g," ").trim();
+    if(!q){setMsg({t:"error",m:"Need type/mfr/amps to search"});return;}
+    
+    setMsg({t:"info",m:`Searching: "${q}"`});
     try{const r=await fetch(`${SB}/functions/v1/ebay-comps`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q})});
       const d=await r.json();
       if(d.stats){uItem(idx,"ebayCompAvg",Math.round(d.stats.avg*100)/100);
-        if(items[idx].disposition!=="scrap")uItem(idx,"estimatedResale",Math.round(d.stats.avg*100)/100);
-        setMsg({t:"success",m:`${d.stats.count} comps. Avg: $${d.stats.avg.toFixed(0)} Low: $${d.stats.low.toFixed(0)} High: $${d.stats.high.toFixed(0)}`});
-      }else{setMsg({t:"error",m:d.message||"No results"});}
+        if(items[idx].disposition!=="scrap"&&d.stats.avg>0)uItem(idx,"estimatedResale",Math.round(d.stats.avg*100)/100);
+        setMsg({t:"success",m:`${d.stats.count} comps for "${q}". Avg: $${d.stats.avg.toFixed(0)} | Low: $${d.stats.low.toFixed(0)} | High: $${d.stats.high.toFixed(0)}`});
+      }else{setMsg({t:"error",m:d.message||d.error||"No results for: "+q});}
     }catch(e){setMsg({t:"error",m:"eBay failed: "+e.message});}
   };
 
@@ -665,7 +730,7 @@ export default function Walkthrough() {
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,padding:"12px 0",borderBottom:"3px solid #0f172a"}}>
         <div><div style={{fontSize:20,fontWeight:800}}>WES Walkthrough</div><div style={{fontSize:11,color:"#94a3b8",fontWeight:600}}>WORLDWIDE ELECTRICAL SERVICES</div></div>
         <div style={{display:"flex",gap:4}}>
-          {[{k:"new",l:"+"},{k:"jobs",l:String(jobs.length)}].map(t=><button key={t.k} onClick={()=>setView(t.k)} style={{padding:"8px 14px",borderRadius:8,border:"none",background:view===t.k?"#0f172a":"#e2e8f0",color:view===t.k?"#fff":"#64748b",fontWeight:700,fontSize:12,cursor:"pointer"}}>{t.l}</button>)}
+          {[{k:"new",l:"+"},{k:"jobs",l:String(jobs.length)},{k:"inventory",l:"📦"}].map(t=><button key={t.k} onClick={()=>{setView(t.k);if(t.k==="inventory")loadInventory();}} style={{padding:"8px 14px",borderRadius:8,border:"none",background:view===t.k?"#0f172a":"#e2e8f0",color:view===t.k?"#fff":"#64748b",fontWeight:700,fontSize:12,cursor:"pointer"}}>{t.l}</button>)}
         </div>
       </div>
 
@@ -729,11 +794,21 @@ export default function Walkthrough() {
 
         {items.map((it,i)=>(
           <div key={i} style={{...card,borderLeft:`4px solid ${gc[it.grade]||"#6b7280"}`,padding:14}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
-              <span style={{fontSize:14,fontWeight:800,color:"#475569"}}>ITEM {i+1}</span>
-              <button onClick={()=>rmItem(i)} style={{background:"none",border:"none",color:"#ef4444",fontSize:20,cursor:"pointer"}}>&times;</button>
+            <div onClick={()=>toggleItem(i)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:expandedItems[i]?10:0}}>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontSize:14,fontWeight:800,color:"#475569"}}>{expandedItems[i]?"▾":"▸"} ITEM {i+1}</span>
+                  {it.grade&&<span style={{padding:"2px 8px",borderRadius:6,background:(gc[it.grade]||"#6b7280")+"18",color:gc[it.grade],fontSize:10,fontWeight:800}}>{it.grade}</span>}
+                  {it.disposition&&it.disposition!=="unassigned"&&<span style={{padding:"2px 6px",borderRadius:6,background:(dc[it.disposition]||"#6b7280")+"15",color:dc[it.disposition],fontSize:9,fontWeight:700}}>{it.disposition}</span>}
+                </div>
+                {!expandedItems[i]&&<div style={{fontSize:11,color:"#64748b",marginTop:2}}>
+                  {it.equipmentType||"No type"}{it.manufacturer?` · ${it.manufacturer}`:""}{it.kvaRating?` · ${it.kvaRating}KVA`:""}{it.amperageRating?` · ${it.amperageRating}A`:""}{it.voltageRating?` · ${it.voltageRating}V`:""}{it.serialNumber?` · S/N:${it.serialNumber}`:""}{parseFloat(it.estimatedResale)>0?` · $${parseFloat(it.estimatedResale).toFixed(0)}`:""}{(it.photos||[]).length>0?` · 📷${(it.photos||[]).length}`:""}
+                </div>}
+              </div>
+              <button onClick={e=>{e.stopPropagation();rmItem(i);}} style={{background:"none",border:"none",color:"#ef4444",fontSize:20,cursor:"pointer"}}>&times;</button>
             </div>
 
+            {expandedItems[i]&&<>
             {/* OCR + Photo row */}
             <div style={{display:"flex",gap:6,marginBottom:10}}>
               <label style={{flex:1,padding:10,borderRadius:8,background:scanning?"#94a3b8":"#0f172a",color:"#fff",fontWeight:700,fontSize:12,textAlign:"center",cursor:"pointer"}}>
@@ -770,7 +845,8 @@ export default function Walkthrough() {
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Year</label><input style={inpSm} type="number" value={it.yearMfg||""} onChange={e=>uItem(i,"yearMfg",e.target.value)} placeholder="2001"/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>In/Out</label><div style={{display:"flex",gap:3}}>{[{v:"indoor",l:"In"},{v:"outdoor",l:"Out"}].map(o=><button key={o.v} onClick={()=>uItem(i,"indoorOutdoor",o.v)} style={{flex:1,padding:"8px 0",borderRadius:6,border:`2px solid ${it.indoorOutdoor===o.v?"#2563eb":"#e2e8f0"}`,background:it.indoorOutdoor===o.v?"#2563eb15":"#fff",color:it.indoorOutdoor===o.v?"#2563eb":"#cbd5e1",fontWeight:700,fontSize:11,cursor:"pointer"}}>{o.l}</button>)}</div></div>
             </div>
-            {/* Specs row 3: transformer specific */}
+            {/* Transformer / Breaker / Switchgear details */}
+            <Section title="Transformer Details" badge={it.kvaRating?`${it.kvaRating}KVA`:""} color="#7c3aed" defaultOpen={it.equipmentType?.toLowerCase().includes("transformer")}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>KVA</label><input style={inpSm} value={it.kvaRating||""} onChange={e=>uItem(i,"kvaRating",e.target.value)} placeholder="Cont."/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>KVA FA</label><input style={inpSm} value={it.kvaForced||""} onChange={e=>uItem(i,"kvaForced",e.target.value)} placeholder="Forced"/></div>
@@ -783,7 +859,8 @@ export default function Walkthrough() {
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Wt (lbs)</label><input style={inpSm} type="number" value={it.nameplateWeight||""} onChange={e=>uItem(i,"nameplateWeight",e.target.value)} placeholder="Total"/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>kAIC</label><input style={inpSm} value={it.interruptRating||""} onChange={e=>uItem(i,"interruptRating",e.target.value)} placeholder="N/A"/></div>
             </div>
-            {/* Breaker-specific fields */}
+            </Section>
+            <Section title="Breaker Details" badge={it.frameSize?`${it.frameSize}A frame`:(it.interruptRating?`${it.interruptRating}kAIC`:"")} color="#0369a1" defaultOpen={it.equipmentType?.toLowerCase().includes("breaker")||it.equipmentType?.toLowerCase().includes("disconnect")}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Frame</label><input style={inpSm} value={it.frameSize||""} onChange={e=>uItem(i,"frameSize",e.target.value)} placeholder="800A"/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Trip</label><input style={inpSm} value={it.tripRating||""} onChange={e=>uItem(i,"tripRating",e.target.value)} placeholder="Sensor"/></div>
@@ -794,7 +871,8 @@ export default function Walkthrough() {
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Breaker Type</label><select style={inpSm} value={it.breakerType||""} onChange={e=>uItem(i,"breakerType",e.target.value)}><option value="">--</option><option value="molded_case">Molded Case (MCCB)</option><option value="power">Power (LVPCB)</option><option value="air">Air (ACB)</option><option value="vacuum">Vacuum (VCB)</option><option value="insulated_case">Insulated Case (ICCB)</option></select></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Trip Unit</label><select style={inpSm} value={it.tripUnitType||""} onChange={e=>uItem(i,"tripUnitType",e.target.value)}><option value="">--</option><option value="thermal_magnetic">Thermal-Magnetic</option><option value="electronic">Electronic</option><option value="LSI">LSI</option><option value="LSIG">LSIG</option><option value="MicroLogic">MicroLogic</option><option value="Digitrip">Digitrip</option></select></div>
             </div>
-            {/* Switchgear-specific fields */}
+            </Section>
+            <Section title="Switchgear Details" badge={it.busRating?`${it.busRating}A bus`:""} color="#059669" defaultOpen={it.equipmentType?.toLowerCase().includes("switchgear")||it.equipmentType?.toLowerCase().includes("mcc")}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Bus Amps</label><input style={inpSm} value={it.busRating||""} onChange={e=>uItem(i,"busRating",e.target.value)} placeholder="2000"/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>SC kA</label><input style={inpSm} value={it.shortCircuitRating||""} onChange={e=>uItem(i,"shortCircuitRating",e.target.value)} placeholder="65kA"/></div>
@@ -806,6 +884,8 @@ export default function Walkthrough() {
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Bus Metal</label><select style={inpSm} value={it.busMaterial||""} onChange={e=>uItem(i,"busMaterial",e.target.value)}><option value="">--</option><option value="CU">Copper</option><option value="AL">Aluminum</option></select></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Type</label><select style={inpSm} value={it.switchgearType||""} onChange={e=>uItem(i,"switchgearType",e.target.value)}><option value="">--</option><option value="metal-clad">Metal-Clad</option><option value="metal-enclosed">Metal-Enclosed</option><option value="dead-front">Dead-Front</option><option value="arc-resistant">Arc-Resistant</option></select></div>
             </div>
+
+            </Section>
 
             {/* Grade */}
             <div style={{display:"flex",gap:4,marginBottom:8}}>
@@ -833,9 +913,9 @@ export default function Walkthrough() {
             </div>
 
             {/* Breaker Inventory */}
-            <div style={{background:"#f0f9ff",borderRadius:10,padding:12,marginBottom:8,border:"1px solid #bae6fd"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                <span style={{fontSize:12,fontWeight:800,color:"#0369a1"}}>BREAKERS ({(it.breakers||[]).reduce((a,b)=>a+(b.count||0),0)} total)</span>
+            <Section title="BREAKERS" badge={`${(it.breakers||[]).reduce((a,b)=>a+(b.count||0),0)} total`} color="#0369a1">
+            <div style={{background:"#f0f9ff",borderRadius:10,padding:12,marginBottom:0,border:"1px solid #bae6fd"}}>
+              <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
                 <button onClick={()=>addBreaker(i)} style={{padding:"6px 12px",borderRadius:6,border:"none",background:"#0369a1",color:"#fff",fontWeight:700,fontSize:11,cursor:"pointer"}}>+ Add</button>
               </div>
               {(it.breakers||[]).length===0&&<div style={{fontSize:12,color:"#94a3b8",textAlign:"center",padding:8}}>No breakers logged. Tap + Add.</div>}
@@ -864,11 +944,12 @@ export default function Walkthrough() {
                 </div>
               ))}
             </div>
+            </Section>
 
             {/* Missing */}
-            <div style={{marginBottom:8}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                <span style={{fontSize:11,fontWeight:700,color:"#dc2626"}}>Missing ({(it.missing||[]).length})</span>
+            <Section title="Missing Components" badge={`${(it.missing||[]).length}`} color="#dc2626">
+            <div style={{marginBottom:0}}>
+              <div style={{display:"flex",justifyContent:"flex-end",marginBottom:4}}>
                 <button onClick={()=>addMissing(i)} style={{padding:"4px 10px",borderRadius:6,border:"none",background:"#dc2626",color:"#fff",fontWeight:700,fontSize:10,cursor:"pointer"}}>+</button>
               </div>
               {(it.missing||[]).map((m,mi)=>(
@@ -879,6 +960,7 @@ export default function Walkthrough() {
                 </div>
               ))}
             </div>
+            </Section>
 
             {/* Condition notes */}
             <input style={inpSm} value={it.conditionNotes} onChange={e=>uItem(i,"conditionNotes",e.target.value)} placeholder="Condition: rust, dents, mods, weather exposure..."/>
@@ -900,6 +982,7 @@ export default function Walkthrough() {
                 <ScanInput label="SKU / Barcode" value={it.barcodeSku} onChange={v=>uItem(i,"barcodeSku",v)} placeholder="Scan or assign..."/>
               </div>
             </div>}
+            </>}
           </div>
         ))}
 
@@ -1018,6 +1101,185 @@ export default function Walkthrough() {
               </div>}
             </div>);
         })}
+      </div>}
+
+      {/* ════ INVENTORY ════ */}
+      {view==="inventory"&&<div>
+        {/* Search bar */}
+        <div style={{marginBottom:10}}>
+          <input style={{...inp,fontSize:15,padding:"14px 16px",background:"#fff"}} value={invSearch} onChange={e=>setInvSearch(e.target.value)} placeholder="Search S/N, model, catalog #, manufacturer..."/>
+        </div>
+
+        {/* Filter chips */}
+        <div style={{display:"flex",gap:6,marginBottom:8,overflowX:"auto",paddingBottom:4}}>
+          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:invFilterType?"#0f172a":"#94a3b8"}} value={invFilterType} onChange={e=>setInvFilterType(e.target.value)}>
+            <option value="">All Types</option>{EQ.map(t=><option key={t}>{t}</option>)}
+          </select>
+          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:invFilterGrade?"#0f172a":"#94a3b8"}} value={invFilterGrade} onChange={e=>setInvFilterGrade(e.target.value)}>
+            <option value="">All Grades</option>{GRD.map(g=><option key={g.v} value={g.v}>{g.v} - {g.d}</option>)}
+          </select>
+          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:invFilterLoc?"#0f172a":"#94a3b8"}} value={invFilterLoc} onChange={e=>setInvFilterLoc(e.target.value)}>
+            <option value="">All Locations</option>{LOC.map(l=><option key={l.v} value={l.v}>{l.l}</option>)}
+          </select>
+          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:"#94a3b8"}} value={invSort} onChange={e=>setInvSort(e.target.value)}>
+            <option value="date_desc">Newest</option>
+            <option value="date_asc">Oldest</option>
+            <option value="type">Type</option>
+            <option value="mfr">Manufacturer</option>
+            <option value="value_desc">Value High</option>
+            <option value="value_asc">Value Low</option>
+          </select>
+        </div>
+
+        {/* Active filter summary + clear */}
+        {(invSearch||invFilterType||invFilterGrade||invFilterLoc)&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <span style={{fontSize:11,color:"#64748b"}}>
+            {inv.filter(item=>{
+              const q=invSearch.toLowerCase();
+              const matchSearch=!q||[item.serial_number,item.model_number,item.manufacturer,item.catalog_number,item.equipment_type,item.barcode_sku,item.voltage_rating,item.amperage_rating,item.kva_rating,item.frame_size].some(f=>f&&String(f).toLowerCase().includes(q));
+              const matchType=!invFilterType||item.equipment_type===invFilterType;
+              const matchGrade=!invFilterGrade||item.grade===invFilterGrade;
+              const matchLoc=!invFilterLoc||item.location===invFilterLoc;
+              return matchSearch&&matchType&&matchGrade&&matchLoc;
+            }).length} of {inv.length} items
+          </span>
+          <button onClick={()=>{setInvSearch("");setInvFilterType("");setInvFilterGrade("");setInvFilterLoc("");}} style={{padding:"4px 10px",borderRadius:6,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontWeight:600,fontSize:10,cursor:"pointer"}}>Clear All</button>
+        </div>}
+
+        {invLoading&&<div style={{textAlign:"center",padding:40,color:"#94a3b8"}}>Loading inventory...</div>}
+
+        {!invLoading&&inv.length===0&&<div style={{textAlign:"center",padding:40}}>
+          <div style={{fontSize:40,marginBottom:8}}>📦</div>
+          <div style={{fontSize:15,fontWeight:700,color:"#475569"}}>No inventory yet</div>
+          <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>Items appear here after pickup or receive.</div>
+        </div>}
+
+        {!invLoading&&inv
+          .filter(item=>{
+            const q=invSearch.toLowerCase();
+            const matchSearch=!q||[item.serial_number,item.model_number,item.manufacturer,item.catalog_number,item.equipment_type,item.barcode_sku,item.voltage_rating,item.amperage_rating,item.kva_rating,item.frame_size].some(f=>f&&String(f).toLowerCase().includes(q));
+            const matchType=!invFilterType||item.equipment_type===invFilterType;
+            const matchGrade=!invFilterGrade||item.grade===invFilterGrade;
+            const matchLoc=!invFilterLoc||item.location===invFilterLoc;
+            return matchSearch&&matchType&&matchGrade&&matchLoc;
+          })
+          .sort((a,b)=>{
+            if(invSort==="date_desc")return new Date(b.created_at)-new Date(a.created_at);
+            if(invSort==="date_asc")return new Date(a.created_at)-new Date(b.created_at);
+            if(invSort==="type")return(a.equipment_type||"").localeCompare(b.equipment_type||"");
+            if(invSort==="mfr")return(a.manufacturer||"").localeCompare(b.manufacturer||"");
+            if(invSort==="value_desc")return(parseFloat(b.asking_price)||parseFloat(b.acquisition_cost)||0)-(parseFloat(a.asking_price)||parseFloat(a.acquisition_cost)||0);
+            if(invSort==="value_asc")return(parseFloat(a.asking_price)||parseFloat(a.acquisition_cost)||0)-(parseFloat(b.asking_price)||parseFloat(b.acquisition_cost)||0);
+            return 0;
+          })
+          .map((item,idx)=>{
+            const isExp=invExpId===item.id;
+            const gradeColor=gc[item.grade]||"#6b7280";
+            return(
+            <div key={item.id} style={{...card,borderLeft:`4px solid ${gradeColor}`,padding:14,marginBottom:8}}>
+              <div onClick={()=>setInvExpId(isExp?null:item.id)} style={{cursor:"pointer"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                      <span style={{fontSize:13,fontWeight:800,color:"#1e293b"}}>{item.equipment_type||"Unknown"}</span>
+                      {item.manufacturer&&<span style={{fontSize:11,color:"#64748b"}}>{item.manufacturer}</span>}
+                      <span style={{padding:"2px 8px",borderRadius:6,background:gradeColor+"18",color:gradeColor,fontSize:10,fontWeight:800}}>{item.grade}</span>
+                      {item.status&&item.status!=="received"&&<span style={{padding:"2px 6px",borderRadius:6,background:"#6366f118",color:"#6366f1",fontSize:9,fontWeight:700}}>{item.status}</span>}
+                    </div>
+                    <div style={{fontSize:11,color:"#64748b",marginTop:3}}>
+                      {item.kva_rating?`${item.kva_rating}KVA`:""}{item.amperage_rating?`${item.kva_rating?" · ":""}${item.amperage_rating}A`:""}{item.frame_size?`${(item.kva_rating||item.amperage_rating)?" · ":""}${item.frame_size}A frame`:""}{item.voltage_rating?` · ${item.voltage_rating}V`:""}{item.serial_number?` · S/N:${item.serial_number}`:""}
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{fontSize:13,fontWeight:800,color:item.asking_price?"#16a34a":"#94a3b8"}}>{item.asking_price?`$${parseFloat(item.asking_price).toFixed(0)}`:""}</div>
+                    <div style={{fontSize:9,color:"#94a3b8"}}>{isExp?"▾":"▸"}</div>
+                  </div>
+                </div>
+                {/* Location + SKU badges */}
+                <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
+                  {item.putaway_location&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#8b5cf618",color:"#8b5cf6",fontWeight:600}}>📍 {item.putaway_location}</span>}
+                  {item.barcode_sku&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#f59e0b18",color:"#f59e0b",fontWeight:600}}>SKU: {item.barcode_sku}</span>}
+                  {item.location&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#0369a118",color:"#0369a1",fontWeight:600}}>{LOC.find(l=>l.v===item.location)?.l||item.location}</span>}
+                  {item.catalog_number&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#47556918",color:"#475569",fontWeight:600}}>Cat: {item.catalog_number}</span>}
+                  {item.job_number&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#0f172a18",color:"#0f172a",fontWeight:600}}>Job: {item.job_number}</span>}
+                </div>
+              </div>
+
+              {/* Expanded detail */}
+              {isExp&&<div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #e5e7eb"}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>S/N</div><div style={{fontSize:12,fontWeight:600}}>{item.serial_number||"N/A"}</div></div>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Model</div><div style={{fontSize:12,fontWeight:600}}>{item.model_number||"N/A"}</div></div>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Cat #</div><div style={{fontSize:12,fontWeight:600}}>{item.catalog_number||"N/A"}</div></div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:10}}>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Amps</div><div style={{fontSize:12,fontWeight:600}}>{item.amperage_rating||"--"}</div></div>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Volts</div><div style={{fontSize:12,fontWeight:600}}>{item.voltage_rating||"--"}</div></div>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>KVA</div><div style={{fontSize:12,fontWeight:600}}>{item.kva_rating||"--"}</div></div>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Phase</div><div style={{fontSize:12,fontWeight:600}}>{item.phase||"--"}</div></div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:10}}>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>NEMA</div><div style={{fontSize:12,fontWeight:600}}>{item.nema_rating||"--"}</div></div>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>In/Out</div><div style={{fontSize:12,fontWeight:600}}>{item.indoor_outdoor||"--"}</div></div>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Year</div><div style={{fontSize:12,fontWeight:600}}>{item.year_manufactured||"--"}</div></div>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>kAIC</div><div style={{fontSize:12,fontWeight:600}}>{item.interrupting_rating||"--"}</div></div>
+                </div>
+
+                {/* Transformer details */}
+                {(item.winding_hv||item.cooling_class||item.liquid_type||item.kva_forced)&&<div style={{background:"#f5f3ff",borderRadius:8,padding:10,marginBottom:8}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#7c3aed",marginBottom:4}}>Transformer</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:4}}>
+                    {item.kva_forced&&<div><div style={{fontSize:9,color:"#94a3b8"}}>KVA FA</div><div style={{fontSize:11,fontWeight:600}}>{item.kva_forced}</div></div>}
+                    {item.cooling_class&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Class</div><div style={{fontSize:11,fontWeight:600}}>{item.cooling_class}</div></div>}
+                    {item.liquid_type&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Liquid</div><div style={{fontSize:11,fontWeight:600}}>{item.liquid_type}</div></div>}
+                    {item.winding_hv&&<div><div style={{fontSize:9,color:"#94a3b8"}}>HV/LV Wind</div><div style={{fontSize:11,fontWeight:600}}>{item.winding_hv}{item.winding_lv?`/${item.winding_lv}`:""}</div></div>}
+                  </div>
+                </div>}
+
+                {/* Breaker details */}
+                {(item.frame_size||item.trip_rating||item.breaker_type||item.trip_unit_type)&&<div style={{background:"#eff6ff",borderRadius:8,padding:10,marginBottom:8}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#0369a1",marginBottom:4}}>Breaker</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:4}}>
+                    {item.frame_size&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Frame</div><div style={{fontSize:11,fontWeight:600}}>{item.frame_size}A</div></div>}
+                    {item.trip_rating&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Trip</div><div style={{fontSize:11,fontWeight:600}}>{item.trip_rating}A</div></div>}
+                    {item.breaker_type&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Type</div><div style={{fontSize:11,fontWeight:600}}>{item.breaker_type}</div></div>}
+                    {item.mounting_type&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Mount</div><div style={{fontSize:11,fontWeight:600}}>{item.mounting_type}</div></div>}
+                  </div>
+                  {item.trip_unit_type&&<div style={{marginTop:4}}><div style={{fontSize:9,color:"#94a3b8"}}>Trip Unit</div><div style={{fontSize:11,fontWeight:600}}>{item.trip_unit_type}</div></div>}
+                </div>}
+
+                {/* Switchgear details */}
+                {(item.bus_rating||item.short_circuit_rating||item.bil_kv||item.switchgear_type)&&<div style={{background:"#ecfdf5",borderRadius:8,padding:10,marginBottom:8}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#059669",marginBottom:4}}>Switchgear</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:4}}>
+                    {item.bus_rating&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Bus</div><div style={{fontSize:11,fontWeight:600}}>{item.bus_rating}A</div></div>}
+                    {item.short_circuit_rating&&<div><div style={{fontSize:9,color:"#94a3b8"}}>SC</div><div style={{fontSize:11,fontWeight:600}}>{item.short_circuit_rating}</div></div>}
+                    {item.bil_kv&&<div><div style={{fontSize:9,color:"#94a3b8"}}>BIL</div><div style={{fontSize:11,fontWeight:600}}>{item.bil_kv}kV</div></div>}
+                    {item.switchgear_type&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Type</div><div style={{fontSize:11,fontWeight:600}}>{item.switchgear_type}</div></div>}
+                  </div>
+                </div>}
+
+                {/* Financial */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Cost</div><div style={{fontSize:12,fontWeight:700}}>{item.acquisition_cost?`$${parseFloat(item.acquisition_cost).toFixed(0)}`:"--"}</div></div>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Refurb</div><div style={{fontSize:12,fontWeight:700}}>{item.refurb_cost?`$${parseFloat(item.refurb_cost).toFixed(0)}`:"--"}</div></div>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Ask</div><div style={{fontSize:12,fontWeight:700,color:"#16a34a"}}>{item.asking_price?`$${parseFloat(item.asking_price).toFixed(0)}`:"--"}</div></div>
+                </div>
+
+                {/* Meta */}
+                <div style={{fontSize:10,color:"#94a3b8"}}>
+                  Received: {item.date_received||"--"}{item.source_job_site?` | From: ${item.source_job_site}`:""}{item.customer_origin?` | Customer: ${item.customer_origin}`:""}
+                </div>
+                {item.condition_notes&&<div style={{fontSize:10,color:"#64748b",marginTop:4,fontStyle:"italic"}}>{item.condition_notes}</div>}
+              </div>}
+            </div>);
+          })
+        }
+
+        {/* Refresh button */}
+        {!invLoading&&inv.length>0&&<div style={{textAlign:"center",padding:12}}>
+          <button onClick={loadInventory} style={{padding:"10px 24px",borderRadius:8,border:"1px solid #d1d5db",background:"#fff",color:"#475569",fontWeight:600,fontSize:12,cursor:"pointer"}}>Refresh</button>
+        </div>}
       </div>}
 
       {/* ═══ RECEIVE VERIFICATION MODAL ═══ */}
