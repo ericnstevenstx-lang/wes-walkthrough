@@ -136,6 +136,19 @@ export default function Walkthrough() {
   const [invFilterLoc,setInvFilterLoc]=useState("");
   const [invSort,setInvSort]=useState("date_desc");
   const [invExpId,setInvExpId]=useState(null);
+  const [skids,setSkids]=useState([]);
+  const [newSkidName,setNewSkidName]=useState("");
+
+  const loadSkids=useCallback(async()=>{
+    try{const data=await dbF("skid_builds?select=*&order=created_at.desc&limit=50");if(data)setSkids(data);}catch{}
+  },[]);
+
+  const createSkid=async(name)=>{
+    const id=`SKD-${Date.now().toString(36).toUpperCase()}`;
+    const num=name||`SKID-${(skids.length+1).toString().padStart(3,"0")}`;
+    const row={id,skid_number:num,status:"building",build_date:today()};
+    try{await dbF("skid_builds",{method:"POST",body:JSON.stringify(row)});setSkids(p=>[row,...p]);return id;}catch{return null;}
+  };
 
   const loadInventory=useCallback(async()=>{
     setInvLoading(true);
@@ -166,6 +179,7 @@ export default function Walkthrough() {
       if(pb)setPriceBook(pb);if(wt)setWeights(wt);
     }}catch{loc=true;}
     try{const r=await fetch(`${SB}/functions/v1/scrap-pricing`);if(r.ok)setScrapPrices(await r.json());}catch{}
+    try{const sk=await dbF("skid_builds?select=*&status=eq.building&order=created_at.desc");if(sk)setSkids(sk);}catch{}
   })();},[]);
 
   /* ── Load jobs ── */
@@ -297,7 +311,7 @@ export default function Walkthrough() {
     ebayCompAvg:0,priceBookValue:0,estimatedWeight:0,
     conditionNotes:"",photos:[],missing:[],breakers:[],
     acquisitionCost:"",refurbCost:"",askingPrice:"",
-    barcodeSku:"",putawayLocation:"",
+    barcodeSku:"",putawayLocation:"",skidId:"",
     // Pickup fields
     pickupStatus:"pending",destination:"main_warehouse",
   }]);
@@ -471,12 +485,16 @@ export default function Walkthrough() {
           frame_size:it.frameSize||null,trip_rating:it.tripRating||null,breaker_type:it.breakerType||null,trip_unit_type:it.tripUnitType||null,mounting_type:it.mountingType||null,catalog_number:it.catalogNumber||null,bus_rating:it.busRating||null,short_circuit_rating:it.shortCircuitRating||null,bil_kv:it.bilKv||null,voltage_class:it.voltageClass||null,num_sections:it.numSections?parseInt(it.numSections):null,bus_material:it.busMaterial||null,switchgear_type:it.switchgearType||null,
           barcode_sku:it.barcodeSku||null,
           putaway_location:it.putawayLocation||null,
+          skid_id:it.skidId||null,
+          status:it.skidId?"staged_for_ship":(it.disposition==="scrap"?"received":"received"),
           received_verified:true,verified_by:job.preparedBy||null,verified_date:job.bidDate||today(),
         };
 
         let ok=false;
         if(!loc){try{
           await dbF("inventory_items",{method:"POST",body:JSON.stringify(invRow)});
+          // Link to skid if assigned
+          if(it.skidId){try{await dbF("skid_items",{method:"POST",body:JSON.stringify({skid_id:it.skidId,inventory_id:invId,sort_order:i})});}catch{}}
           // Subcomponents from breakers
           if(bkrs.length>0){
             const subRows=bkrs.map((b,si)=>({inventory_id:invId,component_type:"Breaker",amp_rating:b.amp||null,poles:parseInt(b.poles)||1,quantity:b.count||1,grade:b.grade||"C",condition_notes:[b.pitting?"Pitting":"",b.contactWear?"Contact wear":""].filter(Boolean).join(", ")||null,is_present:true,salvageable:b.grade!=="D",origin_type:b.oem||"oem",sort_order:si}));
@@ -896,6 +914,24 @@ export default function Walkthrough() {
             <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}>
               {DISP.map(d=><button key={d.v} onClick={()=>uItem(i,"disposition",d.v)} style={{padding:"8px 10px",borderRadius:8,border:`1.5px solid ${it.disposition===d.v?d.c:"#e2e8f0"}`,background:it.disposition===d.v?d.c+"15":"#fff",color:it.disposition===d.v?d.c:"#94a3b8",fontWeight:700,fontSize:11,cursor:"pointer"}}>{d.l}</button>)}
             </div>
+
+            {/* Skid assignment - shows when disposition is skid */}
+            {it.disposition==="skid"&&<div style={{background:"#f0fdfa",borderRadius:10,padding:12,marginBottom:8,border:"1px solid #99f6e4"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#0891b2",marginBottom:6}}>Skid Assignment</div>
+              <div style={{display:"flex",gap:6,alignItems:"end"}}>
+                <div style={{flex:1}}>
+                  <select style={inpSm} value={it.skidId||""} onChange={e=>uItem(i,"skidId",e.target.value)}>
+                    <option value="">Select skid...</option>
+                    {skids.map(s=><option key={s.id} value={s.id}>{s.skid_number}{s.customer_name?` - ${s.customer_name}`:""}</option>)}
+                  </select>
+                </div>
+                <button onClick={async()=>{const name=newSkidName||undefined;const id=await createSkid(name);if(id){uItem(i,"skidId",id);setNewSkidName("");}}} style={{padding:"10px 14px",borderRadius:8,border:"none",background:"#0891b2",color:"#fff",fontWeight:700,fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>+ New</button>
+              </div>
+              {it.skidId&&<div style={{fontSize:10,color:"#0891b2",marginTop:4,fontWeight:600}}>Assigned to: {skids.find(s=>s.id===it.skidId)?.skid_number||it.skidId}</div>}
+              {!it.skidId&&<div style={{marginTop:6}}>
+                <input style={{...inpSm,fontSize:12}} value={newSkidName} onChange={e=>setNewSkidName(e.target.value)} placeholder="New skid name (e.g. SKID-004 or Customer-PO)"/>
+              </div>}
+            </div>}
 
             {/* Pickup destination (in pickup mode) */}
             {mode==="pickup"&&<div style={{marginBottom:8}}>
