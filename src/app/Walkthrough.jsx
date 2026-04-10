@@ -784,6 +784,7 @@ export default function Walkthrough() {
   return(
     <div style={{fontFamily:'-apple-system,BlinkMacSystemFont,"SF Pro",sans-serif',maxWidth:480,margin:"0 auto",padding:"12px 16px",color:"#3d5e3f",minHeight:"100vh",background:"#f1f5f9"}}>
       {/* Header */}
+      {showSplash&&<SplashScreen onDone={()=>setShowSplash(false)}/>}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,padding:"12px 0",borderBottom:"3px solid #58815a"}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}><LogoMark size={28} /><div><div style={{fontSize:16,fontWeight:800,color:"#565756",letterSpacing:2}}>HARDIN</div><div style={{fontSize:9,color:"#58815a",fontWeight:700,letterSpacing:1.5}}>WALKTHROUGH</div></div></div>
         <div style={{display:"flex",gap:4}}>
