@@ -1,7 +1,7 @@
 {
-  "name": "Hardin QC",
-  "short_name": "Hardin QC",
-  "description": "Quality Control - Hardin Power Group",
+  "name": "Hardin Walkthrough",
+  "short_name": "Hardin WALK",
+  "description": "Field Walkthrough - Hardin Power Group",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
