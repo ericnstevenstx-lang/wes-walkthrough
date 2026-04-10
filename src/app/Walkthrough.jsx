@@ -1,6 +1,44 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 
+/* ── Logo Components ───────────────────────────────────── */
+const LogoMark = ({ size = 32, color = "#58815a" }) => (
+  <svg width={size} height={size * 0.9} viewBox="0 0 212 191" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M113.977 155.659C106.789 156.563 99.7953 156.218 93.1887 154.777C92.0481 154.518 91.4671 153.227 92.0266 152.194L98.0737 141.134C98.418 140.489 99.1497 140.144 99.8814 140.23C101.904 140.51 103.992 140.661 106.101 140.661C131.236 140.661 151.702 120.197 151.702 95.0634C151.702 89.813 150.798 84.7562 149.162 80.0652L124.5 125.34C124.199 125.899 123.618 126.222 122.994 126.222H109.243C107.951 126.222 107.134 124.845 107.736 123.704L116.28 108.039C116.602 107.436 116.172 106.726 115.483 106.726H90.1328C89.724 106.726 89.3581 106.942 89.1645 107.307L77.2209 129.234L70.313 141.801C69.7534 142.834 68.3762 143.135 67.4508 142.382C52.4083 130.052 43.3054 110.664 45.2637 89.2965C47.9752 59.9887 71.8839 36.4692 101.237 34.1883C109.587 33.5427 117.614 34.5756 125.038 37.0071C126.286 37.416 126.824 38.8792 126.2 40.0412L120.67 50.1118C120.196 50.994 119.185 51.3814 118.216 51.1231C111.61 49.2941 104.422 48.9068 96.9762 50.3915C78.0601 54.1572 63.3835 69.8871 60.8872 89.0168C59.553 99.2595 61.6619 108.964 66.2026 117.141L93.3824 67.2403C93.5976 66.8315 94.0495 66.5732 94.5014 66.5732H109.221C110.189 66.5732 110.814 67.6061 110.34 68.4669L98.8269 89.6193C98.418 90.3509 98.956 91.2332 99.7953 91.2332H124.931C125.253 91.2332 125.555 91.061 125.727 90.7598L139.995 64.5721L139.952 64.529L146.903 51.7687C147.29 51.0586 148.258 50.9079 148.839 51.4674C161.386 63.7544 168.681 81.3993 166.959 100.658C164.441 128.933 142.19 152.108 114.02 155.659H113.977Z" fill={color}/>
+  </svg>
+);
+
+const SplashScreen = ({ onDone }) => {
+  const [opacity, setOpacity] = useState(0);
+  useEffect(() => {
+    requestAnimationFrame(() => setOpacity(1));
+    const fade = setTimeout(() => setOpacity(0), 2200);
+    const done = setTimeout(onDone, 2800);
+    return () => { clearTimeout(fade); clearTimeout(done); };
+  }, [onDone]);
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 9999,
+      background: "#fff",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      opacity, transition: "opacity 0.6s ease",
+    }}>
+      <LogoMark size={120} />
+      <div style={{ marginTop: 20, fontSize: 32, fontWeight: 800, letterSpacing: 6, color: "#565756", fontFamily: "-apple-system,system-ui,sans-serif" }}>
+        HARDIN
+      </div>
+      <div style={{ marginTop: 6, fontSize: 11, fontWeight: 600, letterSpacing: 4, color: "#58815a" }}>
+        POWER GROUP
+      </div>
+      <div style={{ marginTop: 32, fontSize: 11, color: "#94a3b8", fontWeight: 600, letterSpacing: 2 }}>
+        WALKTHROUGH
+      </div>
+    </div>
+  );
+};
+
+
+
 /* ── Supabase ──────────────────────────────────────────── */
 const SB="https://ulyycjtrshpsjpvbztkr.supabase.co";
 const SK="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVseXljanRyc2hwc2pwdmJ6dGtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMzg1NzAsImV4cCI6MjA5MDcxNDU3MH0.UYwCdYrdy20xl_hCkO8t4CAB16vBHj-oMdflDv1XlVE";
@@ -112,6 +150,7 @@ function ScanInput({value,onChange,placeholder,label,style:st}){
   );
 }
 export default function Walkthrough() {
+  const [showSplash,setShowSplash]=useState(true);
   const [view,setView]=useState("jobs");
   const [mode,setMode]=useState("walkthrough"); // walkthrough | pickup | intake
   const [jobs,setJobs]=useState([]);
@@ -390,7 +429,7 @@ export default function Walkthrough() {
 
   /* ── WhatsApp message builder ── */
   const buildWhatsAppMsg=(j,its)=>{
-    let msg=`*WES ${mode==="walkthrough"?"WALKTHROUGH":"PICKUP"} REPORT*\n`;
+    let msg=`*HARDIN ${mode==="walkthrough"?"WALKTHROUGH":"PICKUP"} REPORT*\n`;
     msg+=`Job: ${j.jobName||j.job_name}\nCustomer: ${j.customerName||j.customer_name}\n`;
     msg+=`Date: ${j.bidDate||j.bid_date}\nBy: ${j.preparedBy||j.prepared_by||""}\n\n`;
     msg+=`*EQUIPMENT (${its.length} items):*\n`;
@@ -738,23 +777,23 @@ export default function Walkthrough() {
     const h=["ID","Job","Customer","Date","Mode","Equipment","Mfr","S/N","Amps","Volts","KVA","KVA FA","Phase","NEMA","In/Out","Year","HV Wind","LV Wind","Class","Liquid","Weight","kAIC","Grade","Disposition","Dest","Qty","Resale $","Scrap $","eBay Avg","Photos","Condition","COGS","Revenue","Margin %"];
     const l=[h.map(esc).join(",")];
     its.forEach((it,i)=>{l.push([esc(b.id),esc(b.job_name),esc(b.customer_name),esc(b.bid_date),esc(b.mode),esc(it.equipment_type),esc(it.manufacturer),esc(it.serial_number),esc(it.amperage_rating),esc(it.voltage_rating),esc(it.kva_rating),esc(it.kva_forced),esc(it.phase),esc(it.nema_rating),esc(it.indoor_outdoor),esc(it.year_manufactured),esc(it.winding_hv),esc(it.winding_lv),esc(it.cooling_class),esc(it.liquid_type),esc(it.nameplate_weight_lbs||it.estimated_weight_lbs),esc(it.interrupting_rating),esc(it.grade),esc(it.disposition),esc(it.destination),esc(it.quantity),esc(it.estimated_resale),esc(it.estimated_scrap),esc(it.ebay_comp_avg),esc(it.photo_count||(it.photos||[]).length),esc(it.notes),esc(i===0?b.total_cogs:""),esc(i===0?b.total_revenue:""),esc(i===0?b.gross_margin_pct:"")].join(","));});
-    const bl=new Blob([l.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download=`WES_${b.mode||"walkthrough"}_${b.id||"export"}.csv`;a.click();
+    const bl=new Blob([l.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download=`Hardin_${b.mode||"walkthrough"}_${b.id||"export"}.csv`;a.click();
   };
 
   /* ════════════════════════════════════════════════════════ */
   return(
-    <div style={{fontFamily:'-apple-system,BlinkMacSystemFont,"SF Pro",sans-serif',maxWidth:480,margin:"0 auto",padding:"12px 16px",color:"#0f172a",minHeight:"100vh",background:"#f1f5f9"}}>
+    <div style={{fontFamily:'-apple-system,BlinkMacSystemFont,"SF Pro",sans-serif',maxWidth:480,margin:"0 auto",padding:"12px 16px",color:"#3d5e3f",minHeight:"100vh",background:"#f1f5f9"}}>
       {/* Header */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,padding:"12px 0",borderBottom:"3px solid #0f172a"}}>
-        <div><div style={{fontSize:20,fontWeight:800}}>WES Walkthrough</div><div style={{fontSize:11,color:"#94a3b8",fontWeight:600}}>WORLDWIDE ELECTRICAL SERVICES</div></div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,padding:"12px 0",borderBottom:"3px solid #58815a"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}><LogoMark size={28} /><div><div style={{fontSize:16,fontWeight:800,color:"#565756",letterSpacing:2}}>HARDIN</div><div style={{fontSize:9,color:"#58815a",fontWeight:700,letterSpacing:1.5}}>WALKTHROUGH</div></div></div>
         <div style={{display:"flex",gap:4}}>
-          {[{k:"new",l:"+"},{k:"jobs",l:String(jobs.length)},{k:"inventory",l:"📦"}].map(t=><button key={t.k} onClick={()=>{setView(t.k);if(t.k==="inventory")loadInventory();}} style={{padding:"8px 14px",borderRadius:8,border:"none",background:view===t.k?"#0f172a":"#e2e8f0",color:view===t.k?"#fff":"#64748b",fontWeight:700,fontSize:12,cursor:"pointer"}}>{t.l}</button>)}
+          {[{k:"new",l:"+"},{k:"jobs",l:String(jobs.length)},{k:"inventory",l:"📦"}].map(t=><button key={t.k} onClick={()=>{setView(t.k);if(t.k==="inventory")loadInventory();}} style={{padding:"8px 14px",borderRadius:8,border:"none",background:view===t.k?"#3d5e3f":"#e2e8f0",color:view===t.k?"#fff":"#64748b",fontWeight:700,fontSize:12,cursor:"pointer"}}>{t.l}</button>)}
         </div>
       </div>
 
       {/* Mode toggle */}
       {view==="new"&&<div style={{display:"flex",gap:4,marginBottom:12}}>
-        {[{m:"walkthrough",i:"\uD83D\uDCCB",l:"Walkthrough"},{m:"pickup",i:"\uD83D\uDE9A",l:"Pickup"},{m:"receive",i:"\uD83D\uDCE6",l:"Receive"}].map(({m,i,l})=><button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"12px 0",borderRadius:10,border:`2.5px solid ${mode===m?"#0f172a":"#e2e8f0"}`,background:mode===m?"#0f172a":"#fff",color:mode===m?"#fff":"#64748b",fontWeight:800,fontSize:13,cursor:"pointer"}}>{i} {l}</button>)}
+        {[{m:"walkthrough",i:"\uD83D\uDCCB",l:"Walkthrough"},{m:"pickup",i:"\uD83D\uDE9A",l:"Pickup"},{m:"receive",i:"\uD83D\uDCE6",l:"Receive"}].map(({m,i,l})=><button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"12px 0",borderRadius:10,border:`2.5px solid ${mode===m?"#3d5e3f":"#e2e8f0"}`,background:mode===m?"#3d5e3f":"#fff",color:mode===m?"#fff":"#64748b",fontWeight:800,fontSize:13,cursor:"pointer"}}>{i} {l}</button>)}
       </div>}
 
       {msg&&<div style={{padding:"12px",background:msg.t==="error"?"#fef2f2":msg.t==="info"?"#eff6ff":"#ecfdf5",border:`1px solid ${msg.t==="error"?"#fecaca":msg.t==="info"?"#bfdbfe":"#a7f3d0"}`,borderRadius:10,color:msg.t==="error"?"#dc2626":msg.t==="info"?"#1d4ed8":"#065f46",fontSize:13,marginBottom:12,display:"flex",justifyContent:"space-between"}}><span>{msg.m}</span><button onClick={()=>setMsg(null)} style={{background:"none",border:"none",fontWeight:700,cursor:"pointer",color:"inherit"}}>&times;</button></div>}
@@ -829,7 +868,7 @@ export default function Walkthrough() {
             {expandedItems[i]&&<>
             {/* OCR + Photo row */}
             <div style={{display:"flex",gap:6,marginBottom:10}}>
-              <label style={{flex:1,padding:10,borderRadius:8,background:scanning?"#94a3b8":"#0f172a",color:"#fff",fontWeight:700,fontSize:12,textAlign:"center",cursor:"pointer"}}>
+              <label style={{flex:1,padding:10,borderRadius:8,background:scanning?"#94a3b8":"#3d5e3f",color:"#fff",fontWeight:700,fontSize:12,textAlign:"center",cursor:"pointer"}}>
                 {scanning?"\u23F3":"📷 Scan Nameplate"}
                 <input type="file" accept="image/*" capture="environment" onChange={e=>handleScan(e.target.files?.[0],i)} style={{display:"none"}} disabled={scanning}/>
               </label>
@@ -1038,7 +1077,7 @@ export default function Walkthrough() {
 
         {/* Actions */}
         <div style={{display:"flex",gap:8,marginBottom:8}}>
-          <button onClick={mode==="receive"?handleReceive:handleSubmit} disabled={sv} style={{flex:2,padding:16,borderRadius:12,border:"none",background:sv?"#94a3b8":mode==="receive"?"linear-gradient(135deg,#16a34a,#15803d)":"linear-gradient(135deg,#0f172a,#1e293b)",color:"#fff",fontSize:16,fontWeight:800,cursor:sv?"not-allowed":"pointer"}}>{sv?"Saving...":mode==="receive"?`Add ${items.length} to Inventory`:"Save"}</button>
+          <button onClick={mode==="receive"?handleReceive:handleSubmit} disabled={sv} style={{flex:2,padding:16,borderRadius:12,border:"none",background:sv?"#94a3b8":mode==="receive"?"linear-gradient(135deg,#16a34a,#15803d)":"linear-gradient(135deg,#3d5e3f,#1e293b)",color:"#fff",fontSize:16,fontWeight:800,cursor:sv?"not-allowed":"pointer"}}>{sv?"Saving...":mode==="receive"?`Add ${items.length} to Inventory`:"Save"}</button>
           <button onClick={()=>sendWhatsApp()} style={{flex:1,padding:16,borderRadius:12,border:"none",background:"#25D366",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>WhatsApp</button>
         </div>
 
@@ -1148,13 +1187,13 @@ export default function Walkthrough() {
 
         {/* Filter chips */}
         <div style={{display:"flex",gap:6,marginBottom:8,overflowX:"auto",paddingBottom:4}}>
-          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:invFilterType?"#0f172a":"#94a3b8"}} value={invFilterType} onChange={e=>setInvFilterType(e.target.value)}>
+          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:invFilterType?"#3d5e3f":"#94a3b8"}} value={invFilterType} onChange={e=>setInvFilterType(e.target.value)}>
             <option value="">All Types</option>{EQ.map(t=><option key={t}>{t}</option>)}
           </select>
-          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:invFilterGrade?"#0f172a":"#94a3b8"}} value={invFilterGrade} onChange={e=>setInvFilterGrade(e.target.value)}>
+          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:invFilterGrade?"#3d5e3f":"#94a3b8"}} value={invFilterGrade} onChange={e=>setInvFilterGrade(e.target.value)}>
             <option value="">All Grades</option>{GRD.map(g=><option key={g.v} value={g.v}>{g.v} - {g.d}</option>)}
           </select>
-          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:invFilterLoc?"#0f172a":"#94a3b8"}} value={invFilterLoc} onChange={e=>setInvFilterLoc(e.target.value)}>
+          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:invFilterLoc?"#3d5e3f":"#94a3b8"}} value={invFilterLoc} onChange={e=>setInvFilterLoc(e.target.value)}>
             <option value="">All Locations</option>{LOC.map(l=><option key={l.v} value={l.v}>{l.l}</option>)}
           </select>
           <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:"#94a3b8"}} value={invSort} onChange={e=>setInvSort(e.target.value)}>
@@ -1237,7 +1276,7 @@ export default function Walkthrough() {
                   {item.barcode_sku&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#f59e0b18",color:"#f59e0b",fontWeight:600}}>SKU: {item.barcode_sku}</span>}
                   {item.location&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#0369a118",color:"#0369a1",fontWeight:600}}>{LOC.find(l=>l.v===item.location)?.l||item.location}</span>}
                   {item.catalog_number&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#47556918",color:"#475569",fontWeight:600}}>Cat: {item.catalog_number}</span>}
-                  {item.job_number&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#0f172a18",color:"#0f172a",fontWeight:600}}>Job: {item.job_number}</span>}
+                  {item.job_number&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#3d5e3f18",color:"#3d5e3f",fontWeight:600}}>Job: {item.job_number}</span>}
                 </div>
               </div>
 
@@ -1328,7 +1367,7 @@ export default function Walkthrough() {
             <ScanInput label="Putaway Location (scan bin/rack barcode)" value={recvPutaway} onChange={setRecvPutaway} placeholder="LOC-A1-01"/>
           </div>
           <div style={{marginBottom:12}}>
-            <ScanInput label="SKU / Barcode (scan or assign)" value={recvSku} onChange={setRecvSku} placeholder="WES-00001"/>
+            <ScanInput label="SKU / Barcode (scan or assign)" value={recvSku} onChange={setRecvSku} placeholder="HDN-00001"/>
           </div>
           <div style={{marginBottom:16}}>
             <label style={{display:"block",fontSize:10,fontWeight:600,color:"#6b7280",marginBottom:2}}>Verified By</label>
