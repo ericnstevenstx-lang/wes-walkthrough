@@ -1,7 +1,8 @@
 "use client";
+import CompPanel from "./CompPanel";
 import { useState, useEffect, useCallback } from "react";
 
-/* ── Logo Components ───────────────────────────────────── */
+/* ââ Logo Components âââââââââââââââââââââââââââââââââââââ */
 const LogoMark = ({ size = 32, color = "#58815a" }) => (
   <svg width={size} height={size * 0.9} viewBox="0 0 212 191" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M113.977 155.659C106.789 156.563 99.7953 156.218 93.1887 154.777C92.0481 154.518 91.4671 153.227 92.0266 152.194L98.0737 141.134C98.418 140.489 99.1497 140.144 99.8814 140.23C101.904 140.51 103.992 140.661 106.101 140.661C131.236 140.661 151.702 120.197 151.702 95.0634C151.702 89.813 150.798 84.7562 149.162 80.0652L124.5 125.34C124.199 125.899 123.618 126.222 122.994 126.222H109.243C107.951 126.222 107.134 124.845 107.736 123.704L116.28 108.039C116.602 107.436 116.172 106.726 115.483 106.726H90.1328C89.724 106.726 89.3581 106.942 89.1645 107.307L77.2209 129.234L70.313 141.801C69.7534 142.834 68.3762 143.135 67.4508 142.382C52.4083 130.052 43.3054 110.664 45.2637 89.2965C47.9752 59.9887 71.8839 36.4692 101.237 34.1883C109.587 33.5427 117.614 34.5756 125.038 37.0071C126.286 37.416 126.824 38.8792 126.2 40.0412L120.67 50.1118C120.196 50.994 119.185 51.3814 118.216 51.1231C111.61 49.2941 104.422 48.9068 96.9762 50.3915C78.0601 54.1572 63.3835 69.8871 60.8872 89.0168C59.553 99.2595 61.6619 108.964 66.2026 117.141L93.3824 67.2403C93.5976 66.8315 94.0495 66.5732 94.5014 66.5732H109.221C110.189 66.5732 110.814 67.6061 110.34 68.4669L98.8269 89.6193C98.418 90.3509 98.956 91.2332 99.7953 91.2332H124.931C125.253 91.2332 125.555 91.061 125.727 90.7598L139.995 64.5721L139.952 64.529L146.903 51.7687C147.29 51.0586 148.258 50.9079 148.839 51.4674C161.386 63.7544 168.681 81.3993 166.959 100.658C164.441 128.933 142.19 152.108 114.02 155.659H113.977Z" fill={color}/>
@@ -28,10 +29,10 @@ const SplashScreen = ({ onDone }) => {
         HARDIN
       </div>
       <div style={{ marginTop: 6, fontSize: 11, fontWeight: 600, letterSpacing: 4, color: "#58815a" }}>
-        POWER GROUP
+        ELECTRICAL GROUP
       </div>
       <div style={{ marginTop: 32, fontSize: 11, color: "#94a3b8", fontWeight: 600, letterSpacing: 2 }}>
-        WALKTHROUGH
+        POWERGATE
       </div>
     </div>
   );
@@ -39,7 +40,7 @@ const SplashScreen = ({ onDone }) => {
 
 
 
-/* ── Supabase ──────────────────────────────────────────── */
+/* ââ Supabase ââââââââââââââââââââââââââââââââââââââââââââ */
 const SB="https://ulyycjtrshpsjpvbztkr.supabase.co";
 const SK="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVseXljanRyc2hwc2pwdmJ6dGtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMzg1NzAsImV4cCI6MjA5MDcxNDU3MH0.UYwCdYrdy20xl_hCkO8t4CAB16vBHj-oMdflDv1XlVE";
 const H={apikey:SK,Authorization:`Bearer ${SK}`,"Content-Type":"application/json",Prefer:"return=representation"};
@@ -48,7 +49,7 @@ async function dbF(p,o={}){const r=await fetch(`${SB}/rest/v1/${p}`,{...o,header
 async function sG(k){try{if(typeof window!=="undefined"&&window.storage){const r=await window.storage.get(k);return r?JSON.parse(r.value):null;}}catch{}return null;}
 async function sS(k,v){try{if(typeof window!=="undefined"&&window.storage)await window.storage.set(k,JSON.stringify(v));}catch{}}
 
-/* ── Constants ─────────────────────────────────────────── */
+/* ââ Constants âââââââââââââââââââââââââââââââââââââââââââ */
 const EQ=["Switchgear","Panelboard","Transformer","Circuit Breaker","Motor Control Center (MCC)","Bus Duct","Disconnect Switch","UPS System","PDU","RPP (Remote Power Panel)","ATS / Transfer Switch","VFD / Drive","Motor Starter","Control Transformer","Trip Unit","Relay","CT / PT","Meter","Other"];
 const MFR=["Eaton / Cutler-Hammer","Siemens","Square D / Schneider","ABB","GE","Westinghouse","ITE","Federal Pacific","Allen-Bradley / Rockwell","Mitsubishi","Yaskawa","Danfoss","Liebert / Vertiv","APC / Schneider","ABL Sursum","Other"];
 const GRD=[{v:"A",c:"#16a34a",d:"Excellent"},{v:"B",c:"#2563eb",d:"Good"},{v:"C",c:"#f59e0b",d:"Fair"},{v:"D",c:"#dc2626",d:"Scrap"}];
@@ -63,25 +64,25 @@ const PHASE=["1","3"];
 const WINDING=[{v:"",l:"N/A"},{v:"CU",l:"Copper"},{v:"AL",l:"Aluminum"}];
 const today=()=>new Date().toISOString().slice(0,10);
 
-/* ── Styles ─────────────────────────────────────────────── */
+/* ââ Styles âââââââââââââââââââââââââââââââââââââââââââââââ */
 const inp={width:"100%",padding:"12px 14px",border:"1.5px solid #d1d5db",borderRadius:10,fontSize:16,background:"#fff",color:"#111",boxSizing:"border-box",outline:"none",fontFamily:"inherit",WebkitAppearance:"none"};
 const inpE={...inp,borderColor:"#ef4444"};
 const inpSm={...inp,fontSize:14,padding:"10px 12px"};
 const lbl={display:"block",fontSize:13,fontWeight:700,color:"#475569",marginBottom:4};
 const card={background:"#fff",borderRadius:14,padding:16,marginBottom:12,boxShadow:"0 1px 3px rgba(0,0,0,0.06)"};
 
-/* ── Collapsible section ── */
+/* ââ Collapsible section ââ */
 function Section({title,children,badge,defaultOpen=false,color="#475569"}){
   const [open,setOpen]=useState(defaultOpen);
   return(<div style={{marginBottom:8}}>
     <button onClick={()=>setOpen(!open)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #e5e7eb",background:open?"#f8fafc":"#fff",cursor:"pointer",fontFamily:"inherit"}}>
-      <span style={{fontSize:11,fontWeight:700,color}}>{open?"▾":"▸"} {title}{badge?` (${badge})`:""}</span>
+      <span style={{fontSize:11,fontWeight:700,color}}>{open?"â¾":"â¸"} {title}{badge?` (${badge})`:""}</span>
     </button>
     {open&&<div style={{padding:"8px 0 0"}}>{children}</div>}
   </div>);
 }
 
-/* ── Photo compression ─────────────────────────────────── */
+/* ââ Photo compression âââââââââââââââââââââââââââââââââââ */
 function compressImage(file,maxW=1200,quality=0.7){
   return new Promise((res)=>{
     const reader=new FileReader();
@@ -100,7 +101,7 @@ function compressImage(file,maxW=1200,quality=0.7){
   });
 }
 
-/* ── Barcode Scanner ──────────────────────────────────── */
+/* ââ Barcode Scanner ââââââââââââââââââââââââââââââââââââ */
 function BarcodeScanner({onScan,onClose,label}){
   const videoRef=useState(null);
   const [err,setErr]=useState(null);
@@ -135,7 +136,7 @@ function BarcodeScanner({onScan,onClose,label}){
   );
 }
 
-/* ── Scan Input (text field + scan button) ────────────── */
+/* ââ Scan Input (text field + scan button) ââââââââââââââ */
 function ScanInput({value,onChange,placeholder,label,style:st}){
   const [scanning,setScanning]=useState(false);
   return(
@@ -166,7 +167,7 @@ export default function Walkthrough() {
   const [expandedItems,setExpandedItems]=useState({});
   const toggleItem=(i)=>setExpandedItems(p=>({...p,[i]:!p[i]}));
 
-  /* ── Inventory browse state ── */
+  /* ââ Inventory browse state ââ */
   const [inv,setInv]=useState([]);
   const [invLoading,setInvLoading]=useState(false);
   const [invSearch,setInvSearch]=useState("");
@@ -203,7 +204,7 @@ export default function Walkthrough() {
     setInvLoading(false);
   },[]);
 
-  /* ── Job form ── */
+  /* ââ Job form ââ */
   const [job,setJob]=useState({
     jobName:"",customerName:"",siteAddress:"",preparedBy:"",bidDate:today(),
     laborHours:"",laborRate:"75",transportCost:"",targetMargin:"45",notes:"",
@@ -211,7 +212,7 @@ export default function Walkthrough() {
   const [items,setItems]=useState([]);
   const [errs,setErrs]=useState({});
 
-  /* ── Load reference data ── */
+  /* ââ Load reference data ââ */
   useEffect(()=>{(async()=>{
     try{if(!loc){
       const[pb,wt]=await Promise.all([dbF("price_book?select=*"),dbF("equipment_weights?select=*")]);
@@ -221,7 +222,7 @@ export default function Walkthrough() {
     try{const sk=await dbF("skid_builds?select=*&status=eq.building&order=created_at.desc");if(sk)setSkids(sk);}catch{}
   })();},[]);
 
-  /* ── Load jobs ── */
+  /* ââ Load jobs ââ */
   const loadJobs=useCallback(async()=>{
     setLd(true);
     try{if(!loc){const d=await dbF("bids?select=*,bid_line_items(*)&order=created_at.desc");if(d){setJobs(d.map(r=>({...r,items:r.bid_line_items||[]}))); setLd(false);return;}}}catch{loc=true;}
@@ -229,10 +230,10 @@ export default function Walkthrough() {
   },[]);
   useEffect(()=>{loadJobs();},[loadJobs]);
 
-  /* ── Helpers ── */
+  /* ââ Helpers ââ */
   const uf=(k,v)=>{setJob(p=>({...p,[k]:v}));if(errs[k])setErrs(p=>({...p,[k]:undefined}));};
 
-  /* ── Price lookup ── */
+  /* ââ Price lookup ââ */
   const lookupPrice=(eqType,grade,amp)=>{
     const m=priceBook.filter(p=>{
       if(p.equipment_type!==eqType||p.grade!==grade)return false;
@@ -256,7 +257,7 @@ export default function Walkthrough() {
     return Math.round((lbs*(parseFloat(wt.copper_pct)||0)/100*(scrapPrices.copper_2||3.4)+lbs*(parseFloat(wt.aluminum_pct)||0)/100*(scrapPrices.aluminum_clean||0.75)+lbs*(parseFloat(wt.steel_pct)||0)/100*(scrapPrices.steel_clean||0.08))*100)/100;
   };
 
-  /* ── OCR ── */
+  /* ââ OCR ââ */
   const handleScan=async(file,idx)=>{
     if(!file)return;setScanning(true);setMsg(null);
     try{
@@ -289,7 +290,7 @@ export default function Walkthrough() {
 
       setItems(prev=>prev.map((it,i)=>i===idx?{...it,
         serialNumber:p.serial_number||it.serialNumber,
-        modelNumber:p.model_number||it.modelNumber,
+        modelNumber:p.model_number||p.catalog_number||it.modelNumber,
         voltageRating:p.voltage_rating||it.voltageRating,
         amperageRating:amps||it.amperageRating,
         kvaRating:kva||it.kvaRating,
@@ -309,7 +310,7 @@ export default function Walkthrough() {
         breakerType:p.breaker_type||it.breakerType,
         tripUnitType:p.trip_unit_type||it.tripUnitType,
         mountingType:p.mounting_type||it.mountingType,
-        catalogNumber:p.catalog_number||it.catalogNumber,
+        catalogNumber:p.catalog_number||p.model_number||it.catalogNumber,
         interruptRating:p.interrupting_rating||it.interruptRating,
         busRating:p.bus_rating||it.busRating,
         shortCircuitRating:p.short_circuit_rating||it.shortCircuitRating,
@@ -324,7 +325,7 @@ export default function Walkthrough() {
     finally{setScanning(false);}
   };
 
-  /* ── Photo upload ── */
+  /* ââ Photo upload ââ */
   const addPhoto=async(file,idx)=>{
     if(!file)return;
     const compressed=await compressImage(file);
@@ -339,7 +340,7 @@ export default function Walkthrough() {
     setItems(prev=>prev.map((it,i)=>i===idx?{...it,photos:[...(it.photos||[]),photoUrl]}:it));
   };
 
-  /* ── Item management ── */
+  /* ââ Item management ââ */
   const addItem=()=>setItems(p=>[...p,{
     equipmentType:"",manufacturer:"",modelNumber:"",serialNumber:"",
     voltageRating:"",amperageRating:"",quantity:1,grade:"C",
@@ -371,17 +372,17 @@ export default function Walkthrough() {
     });
   };
 
-  /* ── Missing component helpers ── */
+  /* ââ Missing component helpers ââ */
   const addMissing=(idx)=>setItems(p=>p.map((it,i)=>i===idx?{...it,missing:[...(it.missing||[]),{type:"",desc:"",qty:1}]}:it));
   const rmMissing=(idx,mi)=>setItems(p=>p.map((it,i)=>i===idx?{...it,missing:it.missing.filter((_,j)=>j!==mi)}:it));
   const uMissing=(idx,mi,f,v)=>setItems(p=>p.map((it,i)=>i===idx?{...it,missing:it.missing.map((m,j)=>j===mi?{...m,[f]:v}:m)}:it));
 
-  /* ── Breaker helpers ── */
+  /* ââ Breaker helpers ââ */
   const addBreaker=(idx)=>setItems(p=>p.map((it,i)=>i===idx?{...it,breakers:[...(it.breakers||[]),{amp:"20",count:1,poles:"1",grade:"B",oem:"oem",pitting:false,contactWear:false,notes:""}]}:it));
   const rmBreaker=(idx,bi)=>setItems(p=>p.map((it,i)=>i===idx?{...it,breakers:it.breakers.filter((_,j)=>j!==bi)}:it));
   const uBreaker=(idx,bi,f,v)=>setItems(p=>p.map((it,i)=>i===idx?{...it,breakers:it.breakers.map((b,j)=>j===bi?{...b,[f]:v}:b)}:it));
 
-  /* ── eBay comp lookup ── */
+  /* ââ eBay comp lookup ââ */
   const fetchEbay=async(idx)=>{
     const item=items[idx];
     // Build smart query based on equipment type and available data
@@ -415,7 +416,7 @@ export default function Walkthrough() {
     }catch(e){setMsg({t:"error",m:"eBay failed: "+e.message});}
   };
 
-  /* ── Calculations ── */
+  /* ââ Calculations ââ */
   const laborCost=(parseFloat(job.laborHours)||0)*(parseFloat(job.laborRate)||0);
   const transportCost=parseFloat(job.transportCost)||0;
   const totalCOGS=laborCost+transportCost;
@@ -427,9 +428,9 @@ export default function Walkthrough() {
   const targetMargin=parseFloat(job.targetMargin)||45;
   const meetsMargin=marginPct>=targetMargin;
 
-  /* ── WhatsApp message builder ── */
+  /* ââ WhatsApp message builder ââ */
   const buildWhatsAppMsg=(j,its)=>{
-    let msg=`*HARDIN ${mode==="walkthrough"?"WALKTHROUGH":"PICKUP"} REPORT*\n`;
+    let msg=`*HARDIN POWERGATE ${mode==="walkthrough"?"WALKTHROUGH":"PICKUP"} REPORT*\n`;
     msg+=`Job: ${j.jobName||j.job_name}\nCustomer: ${j.customerName||j.customer_name}\n`;
     msg+=`Date: ${j.bidDate||j.bid_date}\nBy: ${j.preparedBy||j.prepared_by||""}\n\n`;
     msg+=`*EQUIPMENT (${its.length} items):*\n`;
@@ -471,7 +472,7 @@ export default function Walkthrough() {
     window.open(url,"_blank");
   };
 
-  /* ── Validate ── */
+  /* ââ Validate ââ */
   const validate=()=>{
     const e={};
     if(mode==="receive"){
@@ -484,7 +485,7 @@ export default function Walkthrough() {
     setErrs(e);return Object.keys(e).length===0;
   };
 
-  /* ── Submit: Direct Receive (writes to inventory) ── */
+  /* ââ Submit: Direct Receive (writes to inventory) ââ */
   const handleReceive=async()=>{
     if(!validate())return;
     setSv(true);setMsg(null);
@@ -560,7 +561,7 @@ export default function Walkthrough() {
     }catch(e){setMsg({t:"error",m:e.message});}finally{setSv(false);}
   };
 
-  /* ── Submit ── */
+  /* ââ Submit ââ */
   const handleSubmit=async()=>{
     if(!validate())return;setSv(true);setMsg(null);
     const id=`WK-${Date.now().toString(36).toUpperCase()}`;
@@ -594,14 +595,14 @@ export default function Walkthrough() {
     }catch(e){setMsg({t:"error",m:e.message});}finally{setSv(false);}
   };
 
-  /* ── Patch job ── */
+  /* ââ Patch job ââ */
   const patchJob=async(id,u)=>{
     const ul=jobs.map(r=>r.id===id?{...r,...u}:r);setJobs(ul);
     if(!loc){try{const d={};for(const[k,v]of Object.entries(u))d[k.replace(/[A-Z]/g,m=>"_"+m.toLowerCase())]=v===""?null:v;await dbF(`bids?id=eq.${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(d)});return;}catch{loc=true;}}
     await sS("wes_wt",ul);
   };
 
-  /* ── Pickup: create inventory record from bid line item ── */
+  /* ââ Pickup: create inventory record from bid line item ââ */
   const pickupItem=async(jobData,lineItem,lineIdx)=>{
     const invId=`INV-${Date.now().toString(36).toUpperCase()}`;
     const invRow={
@@ -709,7 +710,7 @@ export default function Walkthrough() {
     }catch(e){setMsg({t:"error",m:"Pickup failed: "+e.message});}
   };
 
-  /* ── Edit line item after the fact (disposition, destination, grade) ── */
+  /* ââ Edit line item after the fact (disposition, destination, grade) ââ */
   const patchLineItem=async(jobId,lineIdx,updates)=>{
     // Update local state
     setJobs(prev=>prev.map(j=>{
@@ -728,7 +729,7 @@ export default function Walkthrough() {
     await sS("wes_wt",jobs);
   };
 
-  /* ── Receive verification: confirm arrival + putaway + SKU ── */
+  /* ââ Receive verification: confirm arrival + putaway + SKU ââ */
   const [recvModal,setRecvModal]=useState(null); // {jobId, lineIdx, item}
   const [recvPutaway,setRecvPutaway]=useState("");
   const [recvSku,setRecvSku]=useState("");
@@ -770,25 +771,25 @@ export default function Walkthrough() {
     setRecvModal(null);
   };
 
-  /* ── Export ── */
+  /* ââ Export ââ */
   const esc=v=>{const s=String(v??"");return s.includes(",")||s.includes('"')?`"${s.replace(/"/g,'""')}"`:s;};
   const exportCSV=(b)=>{
     const its=b.items||b.bid_line_items||[];
     const h=["ID","Job","Customer","Date","Mode","Equipment","Mfr","S/N","Amps","Volts","KVA","KVA FA","Phase","NEMA","In/Out","Year","HV Wind","LV Wind","Class","Liquid","Weight","kAIC","Grade","Disposition","Dest","Qty","Resale $","Scrap $","eBay Avg","Photos","Condition","COGS","Revenue","Margin %"];
     const l=[h.map(esc).join(",")];
     its.forEach((it,i)=>{l.push([esc(b.id),esc(b.job_name),esc(b.customer_name),esc(b.bid_date),esc(b.mode),esc(it.equipment_type),esc(it.manufacturer),esc(it.serial_number),esc(it.amperage_rating),esc(it.voltage_rating),esc(it.kva_rating),esc(it.kva_forced),esc(it.phase),esc(it.nema_rating),esc(it.indoor_outdoor),esc(it.year_manufactured),esc(it.winding_hv),esc(it.winding_lv),esc(it.cooling_class),esc(it.liquid_type),esc(it.nameplate_weight_lbs||it.estimated_weight_lbs),esc(it.interrupting_rating),esc(it.grade),esc(it.disposition),esc(it.destination),esc(it.quantity),esc(it.estimated_resale),esc(it.estimated_scrap),esc(it.ebay_comp_avg),esc(it.photo_count||(it.photos||[]).length),esc(it.notes),esc(i===0?b.total_cogs:""),esc(i===0?b.total_revenue:""),esc(i===0?b.gross_margin_pct:"")].join(","));});
-    const bl=new Blob([l.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download=`Hardin_${b.mode||"walkthrough"}_${b.id||"export"}.csv`;a.click();
+    const bl=new Blob([l.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download=`PowerGate_${b.mode||"walkthrough"}_${b.id||"export"}.csv`;a.click();
   };
 
-  /* ════════════════════════════════════════════════════════ */
+  /* ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
   return(
     <div style={{fontFamily:'-apple-system,BlinkMacSystemFont,"SF Pro",sans-serif',maxWidth:480,margin:"0 auto",padding:"12px 16px",color:"#3d5e3f",minHeight:"100vh",background:"#f1f5f9"}}>
       {/* Header */}
       {showSplash&&<SplashScreen onDone={()=>setShowSplash(false)}/>}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,padding:"12px 0",borderBottom:"3px solid #58815a"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}><LogoMark size={28} /><div><div style={{fontSize:16,fontWeight:800,color:"#565756",letterSpacing:2}}>HARDIN</div><div style={{fontSize:9,color:"#58815a",fontWeight:700,letterSpacing:1.5}}>WALKTHROUGH</div></div></div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}><LogoMark size={28} /><div><div style={{fontSize:16,fontWeight:800,color:"#565756",letterSpacing:2}}>HARDIN</div><div style={{fontSize:9,color:"#58815a",fontWeight:700,letterSpacing:1.5}}>POWERGATE</div></div></div>
         <div style={{display:"flex",gap:4}}>
-          {[{k:"new",l:"+"},{k:"jobs",l:String(jobs.length)},{k:"inventory",l:"📦"}].map(t=><button key={t.k} onClick={()=>{setView(t.k);if(t.k==="inventory")loadInventory();}} style={{padding:"8px 14px",borderRadius:8,border:"none",background:view===t.k?"#3d5e3f":"#e2e8f0",color:view===t.k?"#fff":"#64748b",fontWeight:700,fontSize:12,cursor:"pointer"}}>{t.l}</button>)}
+          {[{k:"new",l:"+"},{k:"jobs",l:String(jobs.length)},{k:"inventory",l:"ð¦"}].map(t=><button key={t.k} onClick={()=>{setView(t.k);if(t.k==="inventory")loadInventory();}} style={{padding:"8px 14px",borderRadius:8,border:"none",background:view===t.k?"#3d5e3f":"#e2e8f0",color:view===t.k?"#fff":"#64748b",fontWeight:700,fontSize:12,cursor:"pointer"}}>{t.l}</button>)}
         </div>
       </div>
 
@@ -799,7 +800,7 @@ export default function Walkthrough() {
 
       {msg&&<div style={{padding:"12px",background:msg.t==="error"?"#fef2f2":msg.t==="info"?"#eff6ff":"#ecfdf5",border:`1px solid ${msg.t==="error"?"#fecaca":msg.t==="info"?"#bfdbfe":"#a7f3d0"}`,borderRadius:10,color:msg.t==="error"?"#dc2626":msg.t==="info"?"#1d4ed8":"#065f46",fontSize:13,marginBottom:12,display:"flex",justifyContent:"space-between"}}><span>{msg.m}</span><button onClick={()=>setMsg(null)} style={{background:"none",border:"none",fontWeight:700,cursor:"pointer",color:"inherit"}}>&times;</button></div>}
 
-      {/* ════ NEW ════ */}
+      {/* ââââ NEW ââââ */}
       {view==="new"&&<div>
         {/* Job Info (walkthrough/pickup only) */}
         {mode!=="receive"&&<div style={card}>
@@ -855,12 +856,12 @@ export default function Walkthrough() {
             <div onClick={()=>toggleItem(i)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:expandedItems[i]?10:0}}>
               <div style={{flex:1}}>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  <span style={{fontSize:14,fontWeight:800,color:"#475569"}}>{expandedItems[i]?"▾":"▸"} ITEM {i+1}</span>
+                  <span style={{fontSize:14,fontWeight:800,color:"#475569"}}>{expandedItems[i]?"â¾":"â¸"} ITEM {i+1}</span>
                   {it.grade&&<span style={{padding:"2px 8px",borderRadius:6,background:(gc[it.grade]||"#6b7280")+"18",color:gc[it.grade],fontSize:10,fontWeight:800}}>{it.grade}</span>}
                   {it.disposition&&it.disposition!=="unassigned"&&<span style={{padding:"2px 6px",borderRadius:6,background:(dc[it.disposition]||"#6b7280")+"15",color:dc[it.disposition],fontSize:9,fontWeight:700}}>{it.disposition}</span>}
                 </div>
                 {!expandedItems[i]&&<div style={{fontSize:11,color:"#64748b",marginTop:2}}>
-                  {it.equipmentType||"No type"}{it.manufacturer?` · ${it.manufacturer}`:""}{it.kvaRating?` · ${it.kvaRating}KVA`:""}{it.amperageRating?` · ${it.amperageRating}A`:""}{it.voltageRating?` · ${it.voltageRating}V`:""}{it.serialNumber?` · S/N:${it.serialNumber}`:""}{parseFloat(it.estimatedResale)>0?` · $${parseFloat(it.estimatedResale).toFixed(0)}`:""}{(it.photos||[]).length>0?` · 📷${(it.photos||[]).length}`:""}
+                  {it.equipmentType||"No type"}{it.manufacturer?` Â· ${it.manufacturer}`:""}{it.kvaRating?` Â· ${it.kvaRating}KVA`:""}{it.amperageRating?` Â· ${it.amperageRating}A`:""}{it.voltageRating?` Â· ${it.voltageRating}V`:""}{it.serialNumber?` Â· S/N:${it.serialNumber}`:""}{parseFloat(it.estimatedResale)>0?` Â· $${parseFloat(it.estimatedResale).toFixed(0)}`:""}{(it.photos||[]).length>0?` Â· ð·${(it.photos||[]).length}`:""}
                 </div>}
               </div>
               <button onClick={e=>{e.stopPropagation();rmItem(i);}} style={{background:"none",border:"none",color:"#ef4444",fontSize:20,cursor:"pointer"}}>&times;</button>
@@ -870,13 +871,29 @@ export default function Walkthrough() {
             {/* OCR + Photo row */}
             <div style={{display:"flex",gap:6,marginBottom:10}}>
               <label style={{flex:1,padding:10,borderRadius:8,background:scanning?"#94a3b8":"#3d5e3f",color:"#fff",fontWeight:700,fontSize:12,textAlign:"center",cursor:"pointer"}}>
-                {scanning?"\u23F3":"📷 Scan Nameplate"}
+                {scanning?"\u23F3":"ð· Scan Nameplate"}
                 <input type="file" accept="image/*" capture="environment" onChange={e=>handleScan(e.target.files?.[0],i)} style={{display:"none"}} disabled={scanning}/>
               </label>
               <label style={{flex:1,padding:10,borderRadius:8,background:"#475569",color:"#fff",fontWeight:700,fontSize:12,textAlign:"center",cursor:"pointer"}}>
-                📸 Add Photo ({(it.photos||[]).length})
+                ð¸ Add Photo ({(it.photos||[]).length})
                 <input type="file" accept="image/*" capture="environment" onChange={e=>addPhoto(e.target.files?.[0],i)} style={{display:"none"}}/>
               </label>
+            </div>
+            {/* Barcode / QR Scanner */}
+            <div style={{display:"flex",gap:6,marginBottom:8}}>
+              <button onClick={()=>{const s=document.createElement("div");s.id="bc_overlay_"+i;document.body.appendChild(s);const cleanup=()=>{const el=document.getElementById("bc_overlay_"+i);if(el)el.remove();};
+                (async()=>{try{
+                  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}}});
+                  const el=document.getElementById("bc_overlay_"+i);if(!el){stream.getTracks().forEach(t=>t.stop());return;}
+                  el.innerHTML='<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center"><div style="color:#fff;font-size:14px;font-weight:700;margin-bottom:12px">Scan Barcode / QR</div><video autoplay playsinline muted style="width:90%;max-width:400px;border-radius:12px;border:3px solid #d97706"></video><div style="margin-top:16px"><button id="bc_cancel_'+i+'" style="padding:12px 24px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-weight:700;font-size:14px;cursor:pointer">Cancel</button></div></div>';
+                  const vid=el.querySelector("video");vid.srcObject=stream;
+                  el.querySelector("#bc_cancel_"+i).onclick=()=>{stream.getTracks().forEach(t=>t.stop());cleanup();};
+                  if(typeof BarcodeDetector!=="undefined"){const det=new BarcodeDetector({formats:["code_128","code_39","ean_13","ean_8","qr_code","upc_a","upc_e"]});
+                    const tick=async()=>{if(!vid||vid.readyState<2){requestAnimationFrame(tick);return;}try{const r=await det.detect(vid);if(r.length){stream.getTracks().forEach(t=>t.stop());cleanup();const v=r[0].rawValue;setItems(prev=>prev.map((it2,j)=>j===i?{...it2,catalogNumber:v,modelNumber:v}:it2));setMsg({t:"success",m:"Scanned: "+v});return;}}catch{}requestAnimationFrame(tick);};tick();}
+                }catch(e){setMsg({t:"error",m:"Camera: "+e.message});cleanup();}})();
+              }} style={{flex:1,padding:8,borderRadius:8,border:"1.5px solid #d97706",background:"#fff7ed",color:"#92400e",fontWeight:700,fontSize:11,cursor:"pointer",textAlign:"center"}}>
+                Barcode / QR
+              </button>
             </div>
 
             {/* Photo thumbnails */}
@@ -988,6 +1005,8 @@ export default function Walkthrough() {
               <div><button onClick={()=>fetchEbay(i)} style={{width:"100%",padding:"10px 0",borderRadius:8,border:"1px solid #16a34a",background:"#fff",color:"#16a34a",fontWeight:700,fontSize:11,cursor:"pointer",marginTop:18}}>eBay{it.ebayCompAvg>0?` $${it.ebayCompAvg.toFixed(0)}`:""}</button></div>
             </div>
 
+            {/* Full Market Comps Panel */}
+            <CompPanel item={{equipmentType:it.equipmentType,manufacturer:it.manufacturer,modelNumber:it.modelNumber,catalogNumber:it.catalogNumber,amperageRating:it.amperageRating,kvaRating:it.kvaRating,voltageRating:it.voltageRating,grade:it.grade,equipment_type:it.equipmentType,model_number:it.modelNumber,catalog_number:it.catalogNumber,amperage_rating:it.amperageRating,kva_rating:it.kvaRating,voltage_rating:it.voltageRating}} />
             {/* Breaker Inventory */}
             <Section title="BREAKERS" badge={`${(it.breakers||[]).reduce((a,b)=>a+(b.count||0),0)} total`} color="#0369a1">
             <div style={{background:"#f0f9ff",borderRadius:10,padding:12,marginBottom:0,border:"1px solid #bae6fd"}}>
@@ -1086,7 +1105,7 @@ export default function Walkthrough() {
         <div style={card}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:60,resize:"vertical"}} value={job.notes} onChange={e=>uf("notes",e.target.value)} placeholder="Scope, exclusions, access notes..."/></div>
       </div>}
 
-      {/* ════ JOB LIST ════ */}
+      {/* ââââ JOB LIST ââââ */}
       {view==="jobs"&&<div>
         <div style={{display:"flex",gap:6,marginBottom:14}}>
           <button onClick={loadJobs} style={{flex:1,padding:10,borderRadius:8,border:"1px solid #d1d5db",background:"#fff",color:"#475569",fontWeight:700,fontSize:13,cursor:"pointer"}}>{ld?"...":"Refresh"}</button>
@@ -1179,7 +1198,7 @@ export default function Walkthrough() {
         })}
       </div>}
 
-      {/* ════ INVENTORY ════ */}
+      {/* ââââ INVENTORY ââââ */}
       {view==="inventory"&&<div>
         {/* Search bar */}
         <div style={{marginBottom:10}}>
@@ -1225,7 +1244,7 @@ export default function Walkthrough() {
         {invLoading&&<div style={{textAlign:"center",padding:40,color:"#94a3b8"}}>Loading inventory...</div>}
 
         {!invLoading&&inv.length===0&&<div style={{textAlign:"center",padding:40}}>
-          <div style={{fontSize:40,marginBottom:8}}>📦</div>
+          <div style={{fontSize:40,marginBottom:8}}>ð¦</div>
           <div style={{fontSize:15,fontWeight:700,color:"#475569"}}>No inventory yet</div>
           <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>Items appear here after pickup or receive.</div>
         </div>}
@@ -1263,17 +1282,17 @@ export default function Walkthrough() {
                       {item.status&&item.status!=="received"&&<span style={{padding:"2px 6px",borderRadius:6,background:"#6366f118",color:"#6366f1",fontSize:9,fontWeight:700}}>{item.status}</span>}
                     </div>
                     <div style={{fontSize:11,color:"#64748b",marginTop:3}}>
-                      {item.kva_rating?`${item.kva_rating}KVA`:""}{item.amperage_rating?`${item.kva_rating?" · ":""}${item.amperage_rating}A`:""}{item.frame_size?`${(item.kva_rating||item.amperage_rating)?" · ":""}${item.frame_size}A frame`:""}{item.voltage_rating?` · ${item.voltage_rating}V`:""}{item.serial_number?` · S/N:${item.serial_number}`:""}
+                      {item.kva_rating?`${item.kva_rating}KVA`:""}{item.amperage_rating?`${item.kva_rating?" Â· ":""}${item.amperage_rating}A`:""}{item.frame_size?`${(item.kva_rating||item.amperage_rating)?" Â· ":""}${item.frame_size}A frame`:""}{item.voltage_rating?` Â· ${item.voltage_rating}V`:""}{item.serial_number?` Â· S/N:${item.serial_number}`:""}
                     </div>
                   </div>
                   <div style={{textAlign:"right",flexShrink:0}}>
                     <div style={{fontSize:13,fontWeight:800,color:item.asking_price?"#16a34a":"#94a3b8"}}>{item.asking_price?`$${parseFloat(item.asking_price).toFixed(0)}`:""}</div>
-                    <div style={{fontSize:9,color:"#94a3b8"}}>{isExp?"▾":"▸"}</div>
+                    <div style={{fontSize:9,color:"#94a3b8"}}>{isExp?"â¾":"â¸"}</div>
                   </div>
                 </div>
                 {/* Location + SKU badges */}
                 <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
-                  {item.putaway_location&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#8b5cf618",color:"#8b5cf6",fontWeight:600}}>📍 {item.putaway_location}</span>}
+                  {item.putaway_location&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#8b5cf618",color:"#8b5cf6",fontWeight:600}}>ð {item.putaway_location}</span>}
                   {item.barcode_sku&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#f59e0b18",color:"#f59e0b",fontWeight:600}}>SKU: {item.barcode_sku}</span>}
                   {item.location&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#0369a118",color:"#0369a1",fontWeight:600}}>{LOC.find(l=>l.v===item.location)?.l||item.location}</span>}
                   {item.catalog_number&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#47556918",color:"#475569",fontWeight:600}}>Cat: {item.catalog_number}</span>}
@@ -1358,7 +1377,7 @@ export default function Walkthrough() {
         </div>}
       </div>}
 
-      {/* ═══ RECEIVE VERIFICATION MODAL ═══ */}
+      {/* âââ RECEIVE VERIFICATION MODAL âââ */}
       {recvModal&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:9998,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setRecvModal(null)}>
         <div style={{background:"#fff",borderRadius:16,padding:20,maxWidth:400,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
           <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>Verify Receipt</div>
