@@ -226,7 +226,7 @@ export default function CompPanel({ item }) {
               ].map(s => (
                 <a key={s.l} href={s.u} target="_blank" rel="noopener noreferrer"
                   style={{ padding: "6px 12px", background: "#f1f5f9", color: "#3b82f6", borderRadius: 4, fontSize: 12, textDecoration: "none", border: "1px solid #e2e8f0" }}>
-                  {s.l} ->
+                  {s.l}
                 </a>
               ))}
             </div>
