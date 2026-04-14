@@ -2,7 +2,7 @@
 import CompPanel from "./CompPanel";
 import { useState, useEffect, useCallback } from "react";
 
-/* ââ Logo Components âââââââââââââââââââââââââââââââââââââ */
+/* ── Logo Components ───────────────────────────────────── */
 const LogoMark = ({ size = 32, color = "#58815a" }) => (
   <svg width={size} height={size * 0.9} viewBox="0 0 212 191" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M113.977 155.659C106.789 156.563 99.7953 156.218 93.1887 154.777C92.0481 154.518 91.4671 153.227 92.0266 152.194L98.0737 141.134C98.418 140.489 99.1497 140.144 99.8814 140.23C101.904 140.51 103.992 140.661 106.101 140.661C131.236 140.661 151.702 120.197 151.702 95.0634C151.702 89.813 150.798 84.7562 149.162 80.0652L124.5 125.34C124.199 125.899 123.618 126.222 122.994 126.222H109.243C107.951 126.222 107.134 124.845 107.736 123.704L116.28 108.039C116.602 107.436 116.172 106.726 115.483 106.726H90.1328C89.724 106.726 89.3581 106.942 89.1645 107.307L77.2209 129.234L70.313 141.801C69.7534 142.834 68.3762 143.135 67.4508 142.382C52.4083 130.052 43.3054 110.664 45.2637 89.2965C47.9752 59.9887 71.8839 36.4692 101.237 34.1883C109.587 33.5427 117.614 34.5756 125.038 37.0071C126.286 37.416 126.824 38.8792 126.2 40.0412L120.67 50.1118C120.196 50.994 119.185 51.3814 118.216 51.1231C111.61 49.2941 104.422 48.9068 96.9762 50.3915C78.0601 54.1572 63.3835 69.8871 60.8872 89.0168C59.553 99.2595 61.6619 108.964 66.2026 117.141L93.3824 67.2403C93.5976 66.8315 94.0495 66.5732 94.5014 66.5732H109.221C110.189 66.5732 110.814 67.6061 110.34 68.4669L98.8269 89.6193C98.418 90.3509 98.956 91.2332 99.7953 91.2332H124.931C125.253 91.2332 125.555 91.061 125.727 90.7598L139.995 64.5721L139.952 64.529L146.903 51.7687C147.29 51.0586 148.258 50.9079 148.839 51.4674C161.386 63.7544 168.681 81.3993 166.959 100.658C164.441 128.933 142.19 152.108 114.02 155.659H113.977Z" fill={color}/>
@@ -40,7 +40,7 @@ const SplashScreen = ({ onDone }) => {
 
 
 
-/* ââ Supabase ââââââââââââââââââââââââââââââââââââââââââââ */
+/* ── Supabase ──────────────────────────────────────────── */
 const SB="https://ulyycjtrshpsjpvbztkr.supabase.co";
 const SK="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVseXljanRyc2hwc2pwdmJ6dGtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMzg1NzAsImV4cCI6MjA5MDcxNDU3MH0.UYwCdYrdy20xl_hCkO8t4CAB16vBHj-oMdflDv1XlVE";
 const H={apikey:SK,Authorization:`Bearer ${SK}`,"Content-Type":"application/json",Prefer:"return=representation"};
@@ -49,7 +49,7 @@ async function dbF(p,o={}){const r=await fetch(`${SB}/rest/v1/${p}`,{...o,header
 async function sG(k){try{if(typeof window!=="undefined"&&window.storage){const r=await window.storage.get(k);return r?JSON.parse(r.value):null;}}catch{}return null;}
 async function sS(k,v){try{if(typeof window!=="undefined"&&window.storage)await window.storage.set(k,JSON.stringify(v));}catch{}}
 
-/* ââ Constants âââââââââââââââââââââââââââââââââââââââââââ */
+/* ── Constants ─────────────────────────────────────────── */
 const EQ=["Switchgear","Panelboard","Transformer","Circuit Breaker","Motor Control Center (MCC)","Bus Duct","Disconnect Switch","UPS System","PDU","RPP (Remote Power Panel)","ATS / Transfer Switch","VFD / Drive","Motor Starter","Control Transformer","Trip Unit","Relay","CT / PT","Meter","Other"];
 const MFR=["Eaton / Cutler-Hammer","Siemens","Square D / Schneider","ABB","GE","Westinghouse","ITE","Federal Pacific","Allen-Bradley / Rockwell","Mitsubishi","Yaskawa","Danfoss","Liebert / Vertiv","APC / Schneider","ABL Sursum","Other"];
 const GRD=[{v:"A",c:"#16a34a",d:"Excellent"},{v:"B",c:"#2563eb",d:"Good"},{v:"C",c:"#f59e0b",d:"Fair"},{v:"D",c:"#dc2626",d:"Scrap"}];
@@ -64,25 +64,25 @@ const PHASE=["1","3"];
 const WINDING=[{v:"",l:"N/A"},{v:"CU",l:"Copper"},{v:"AL",l:"Aluminum"}];
 const today=()=>new Date().toISOString().slice(0,10);
 
-/* ââ Styles âââââââââââââââââââââââââââââââââââââââââââââââ */
+/* ── Styles ─────────────────────────────────────────────── */
 const inp={width:"100%",padding:"12px 14px",border:"1.5px solid #d1d5db",borderRadius:10,fontSize:16,background:"#fff",color:"#111",boxSizing:"border-box",outline:"none",fontFamily:"inherit",WebkitAppearance:"none"};
 const inpE={...inp,borderColor:"#ef4444"};
 const inpSm={...inp,fontSize:14,padding:"10px 12px"};
 const lbl={display:"block",fontSize:13,fontWeight:700,color:"#475569",marginBottom:4};
 const card={background:"#fff",borderRadius:14,padding:16,marginBottom:12,boxShadow:"0 1px 3px rgba(0,0,0,0.06)"};
 
-/* ââ Collapsible section ââ */
+/* ── Collapsible section ── */
 function Section({title,children,badge,defaultOpen=false,color="#475569"}){
   const [open,setOpen]=useState(defaultOpen);
   return(<div style={{marginBottom:8}}>
     <button onClick={()=>setOpen(!open)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #e5e7eb",background:open?"#f8fafc":"#fff",cursor:"pointer",fontFamily:"inherit"}}>
-      <span style={{fontSize:11,fontWeight:700,color}}>{open?"â¾":"â¸"} {title}{badge?` (${badge})`:""}</span>
+      <span style={{fontSize:11,fontWeight:700,color}}>{open?"▾":"▸"} {title}{badge?` (${badge})`:""}</span>
     </button>
     {open&&<div style={{padding:"8px 0 0"}}>{children}</div>}
   </div>);
 }
 
-/* ââ Photo compression âââââââââââââââââââââââââââââââââââ */
+/* ── Photo compression ─────────────────────────────────── */
 function compressImage(file,maxW=1200,quality=0.7){
   return new Promise((res)=>{
     const reader=new FileReader();
@@ -101,7 +101,7 @@ function compressImage(file,maxW=1200,quality=0.7){
   });
 }
 
-/* ââ Barcode Scanner ââââââââââââââââââââââââââââââââââââ */
+/* ── Barcode Scanner ──────────────────────────────────── */
 function BarcodeScanner({onScan,onClose,label}){
   const videoRef=useState(null);
   const [err,setErr]=useState(null);
@@ -136,7 +136,7 @@ function BarcodeScanner({onScan,onClose,label}){
   );
 }
 
-/* ââ Scan Input (text field + scan button) ââââââââââââââ */
+/* ── Scan Input (text field + scan button) ────────────── */
 function ScanInput({value,onChange,placeholder,label,style:st}){
   const [scanning,setScanning]=useState(false);
   return(
@@ -167,7 +167,7 @@ export default function Walkthrough() {
   const [expandedItems,setExpandedItems]=useState({});
   const toggleItem=(i)=>setExpandedItems(p=>({...p,[i]:!p[i]}));
 
-  /* ââ Inventory browse state ââ */
+  /* ── Inventory browse state ── */
   const [inv,setInv]=useState([]);
   const [invLoading,setInvLoading]=useState(false);
   const [invSearch,setInvSearch]=useState("");
@@ -204,7 +204,7 @@ export default function Walkthrough() {
     setInvLoading(false);
   },[]);
 
-  /* ââ Job form ââ */
+  /* ── Job form ── */
   const [job,setJob]=useState({
     jobName:"",customerName:"",siteAddress:"",preparedBy:"",bidDate:today(),
     laborHours:"",laborRate:"75",transportCost:"",targetMargin:"45",notes:"",
@@ -212,7 +212,7 @@ export default function Walkthrough() {
   const [items,setItems]=useState([]);
   const [errs,setErrs]=useState({});
 
-  /* ââ Load reference data ââ */
+  /* ── Load reference data ── */
   useEffect(()=>{(async()=>{
     try{if(!loc){
       const[pb,wt]=await Promise.all([dbF("price_book?select=*"),dbF("equipment_weights?select=*")]);
@@ -222,7 +222,7 @@ export default function Walkthrough() {
     try{const sk=await dbF("skid_builds?select=*&status=eq.building&order=created_at.desc");if(sk)setSkids(sk);}catch{}
   })();},[]);
 
-  /* ââ Load jobs ââ */
+  /* ── Load jobs ── */
   const loadJobs=useCallback(async()=>{
     setLd(true);
     try{if(!loc){const d=await dbF("bids?select=*,bid_line_items(*)&order=created_at.desc");if(d){setJobs(d.map(r=>({...r,items:r.bid_line_items||[]}))); setLd(false);return;}}}catch{loc=true;}
@@ -230,10 +230,10 @@ export default function Walkthrough() {
   },[]);
   useEffect(()=>{loadJobs();},[loadJobs]);
 
-  /* ââ Helpers ââ */
+  /* ── Helpers ── */
   const uf=(k,v)=>{setJob(p=>({...p,[k]:v}));if(errs[k])setErrs(p=>({...p,[k]:undefined}));};
 
-  /* ââ Price lookup ââ */
+  /* ── Price lookup ── */
   const lookupPrice=(eqType,grade,amp)=>{
     const m=priceBook.filter(p=>{
       if(p.equipment_type!==eqType||p.grade!==grade)return false;
@@ -257,7 +257,7 @@ export default function Walkthrough() {
     return Math.round((lbs*(parseFloat(wt.copper_pct)||0)/100*(scrapPrices.copper_2||3.4)+lbs*(parseFloat(wt.aluminum_pct)||0)/100*(scrapPrices.aluminum_clean||0.75)+lbs*(parseFloat(wt.steel_pct)||0)/100*(scrapPrices.steel_clean||0.08))*100)/100;
   };
 
-  /* ââ OCR ââ */
+  /* ── OCR ── */
   const handleScan=async(file,idx)=>{
     if(!file)return;setScanning(true);setMsg(null);
     try{
@@ -325,7 +325,7 @@ export default function Walkthrough() {
     finally{setScanning(false);}
   };
 
-  /* ââ Photo upload ââ */
+  /* ── Photo upload ── */
   const addPhoto=async(file,idx)=>{
     if(!file)return;
     const compressed=await compressImage(file);
@@ -340,7 +340,7 @@ export default function Walkthrough() {
     setItems(prev=>prev.map((it,i)=>i===idx?{...it,photos:[...(it.photos||[]),photoUrl]}:it));
   };
 
-  /* ââ Item management ââ */
+  /* ── Item management ── */
   const addItem=()=>setItems(p=>[...p,{
     equipmentType:"",manufacturer:"",modelNumber:"",serialNumber:"",
     voltageRating:"",amperageRating:"",quantity:1,grade:"C",
@@ -372,17 +372,17 @@ export default function Walkthrough() {
     });
   };
 
-  /* ââ Missing component helpers ââ */
+  /* ── Missing component helpers ── */
   const addMissing=(idx)=>setItems(p=>p.map((it,i)=>i===idx?{...it,missing:[...(it.missing||[]),{type:"",desc:"",qty:1}]}:it));
   const rmMissing=(idx,mi)=>setItems(p=>p.map((it,i)=>i===idx?{...it,missing:it.missing.filter((_,j)=>j!==mi)}:it));
   const uMissing=(idx,mi,f,v)=>setItems(p=>p.map((it,i)=>i===idx?{...it,missing:it.missing.map((m,j)=>j===mi?{...m,[f]:v}:m)}:it));
 
-  /* ââ Breaker helpers ââ */
+  /* ── Breaker helpers ── */
   const addBreaker=(idx)=>setItems(p=>p.map((it,i)=>i===idx?{...it,breakers:[...(it.breakers||[]),{amp:"20",count:1,poles:"1",grade:"B",oem:"oem",pitting:false,contactWear:false,notes:""}]}:it));
   const rmBreaker=(idx,bi)=>setItems(p=>p.map((it,i)=>i===idx?{...it,breakers:it.breakers.filter((_,j)=>j!==bi)}:it));
   const uBreaker=(idx,bi,f,v)=>setItems(p=>p.map((it,i)=>i===idx?{...it,breakers:it.breakers.map((b,j)=>j===bi?{...b,[f]:v}:b)}:it));
 
-  /* ââ eBay comp lookup ââ */
+  /* ── eBay comp lookup ── */
   const fetchEbay=async(idx)=>{
     const item=items[idx];
     // Build smart query based on equipment type and available data
@@ -416,7 +416,7 @@ export default function Walkthrough() {
     }catch(e){setMsg({t:"error",m:"eBay failed: "+e.message});}
   };
 
-  /* ââ Calculations ââ */
+  /* ── Calculations ── */
   const laborCost=(parseFloat(job.laborHours)||0)*(parseFloat(job.laborRate)||0);
   const transportCost=parseFloat(job.transportCost)||0;
   const totalCOGS=laborCost+transportCost;
@@ -428,7 +428,7 @@ export default function Walkthrough() {
   const targetMargin=parseFloat(job.targetMargin)||45;
   const meetsMargin=marginPct>=targetMargin;
 
-  /* ââ WhatsApp message builder ââ */
+  /* ── WhatsApp message builder ── */
   const buildWhatsAppMsg=(j,its)=>{
     let msg=`*HARDIN POWERGATE ${mode==="walkthrough"?"WALKTHROUGH":"PICKUP"} REPORT*\n`;
     msg+=`Job: ${j.jobName||j.job_name}\nCustomer: ${j.customerName||j.customer_name}\n`;
@@ -472,7 +472,7 @@ export default function Walkthrough() {
     window.open(url,"_blank");
   };
 
-  /* ââ Validate ââ */
+  /* ── Validate ── */
   const validate=()=>{
     const e={};
     if(mode==="receive"){
@@ -485,7 +485,7 @@ export default function Walkthrough() {
     setErrs(e);return Object.keys(e).length===0;
   };
 
-  /* ââ Submit: Direct Receive (writes to inventory) ââ */
+  /* ── Submit: Direct Receive (writes to inventory) ── */
   const handleReceive=async()=>{
     if(!validate())return;
     setSv(true);setMsg(null);
@@ -561,7 +561,7 @@ export default function Walkthrough() {
     }catch(e){setMsg({t:"error",m:e.message});}finally{setSv(false);}
   };
 
-  /* ââ Submit ââ */
+  /* ── Submit ── */
   const handleSubmit=async()=>{
     if(!validate())return;setSv(true);setMsg(null);
     const id=`WK-${Date.now().toString(36).toUpperCase()}`;
@@ -595,14 +595,14 @@ export default function Walkthrough() {
     }catch(e){setMsg({t:"error",m:e.message});}finally{setSv(false);}
   };
 
-  /* ââ Patch job ââ */
+  /* ── Patch job ── */
   const patchJob=async(id,u)=>{
     const ul=jobs.map(r=>r.id===id?{...r,...u}:r);setJobs(ul);
     if(!loc){try{const d={};for(const[k,v]of Object.entries(u))d[k.replace(/[A-Z]/g,m=>"_"+m.toLowerCase())]=v===""?null:v;await dbF(`bids?id=eq.${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(d)});return;}catch{loc=true;}}
     await sS("wes_wt",ul);
   };
 
-  /* ââ Pickup: create inventory record from bid line item ââ */
+  /* ── Pickup: create inventory record from bid line item ── */
   const pickupItem=async(jobData,lineItem,lineIdx)=>{
     const invId=`INV-${Date.now().toString(36).toUpperCase()}`;
     const invRow={
@@ -710,7 +710,7 @@ export default function Walkthrough() {
     }catch(e){setMsg({t:"error",m:"Pickup failed: "+e.message});}
   };
 
-  /* ââ Edit line item after the fact (disposition, destination, grade) ââ */
+  /* ── Edit line item after the fact (disposition, destination, grade) ── */
   const patchLineItem=async(jobId,lineIdx,updates)=>{
     // Update local state
     setJobs(prev=>prev.map(j=>{
@@ -729,7 +729,7 @@ export default function Walkthrough() {
     await sS("wes_wt",jobs);
   };
 
-  /* ââ Receive verification: confirm arrival + putaway + SKU ââ */
+  /* ── Receive verification: confirm arrival + putaway + SKU ── */
   const [recvModal,setRecvModal]=useState(null); // {jobId, lineIdx, item}
   const [recvPutaway,setRecvPutaway]=useState("");
   const [recvSku,setRecvSku]=useState("");
@@ -771,7 +771,7 @@ export default function Walkthrough() {
     setRecvModal(null);
   };
 
-  /* ââ Export ââ */
+  /* ── Export ── */
   const esc=v=>{const s=String(v??"");return s.includes(",")||s.includes('"')?`"${s.replace(/"/g,'""')}"`:s;};
   const exportCSV=(b)=>{
     const its=b.items||b.bid_line_items||[];
@@ -856,7 +856,7 @@ export default function Walkthrough() {
             <div onClick={()=>toggleItem(i)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:expandedItems[i]?10:0}}>
               <div style={{flex:1}}>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  <span style={{fontSize:14,fontWeight:800,color:"#475569"}}>{expandedItems[i]?"â¾":"â¸"} ITEM {i+1}</span>
+                  <span style={{fontSize:14,fontWeight:800,color:"#475569"}}>{expandedItems[i]?"▾":"▸"} ITEM {i+1}</span>
                   {it.grade&&<span style={{padding:"2px 8px",borderRadius:6,background:(gc[it.grade]||"#6b7280")+"18",color:gc[it.grade],fontSize:10,fontWeight:800}}>{it.grade}</span>}
                   {it.disposition&&it.disposition!=="unassigned"&&<span style={{padding:"2px 6px",borderRadius:6,background:(dc[it.disposition]||"#6b7280")+"15",color:dc[it.disposition],fontSize:9,fontWeight:700}}>{it.disposition}</span>}
                 </div>
@@ -871,11 +871,11 @@ export default function Walkthrough() {
             {/* OCR + Photo row */}
             <div style={{display:"flex",gap:6,marginBottom:10}}>
               <label style={{flex:1,padding:10,borderRadius:8,background:scanning?"#94a3b8":"#3d5e3f",color:"#fff",fontWeight:700,fontSize:12,textAlign:"center",cursor:"pointer"}}>
-                {scanning?"\u23F3":"ð· Scan Nameplate"}
+                {scanning?"\u23F3":"📷 Scan Nameplate"}
                 <input type="file" accept="image/*" capture="environment" onChange={e=>handleScan(e.target.files?.[0],i)} style={{display:"none"}} disabled={scanning}/>
               </label>
               <label style={{flex:1,padding:10,borderRadius:8,background:"#475569",color:"#fff",fontWeight:700,fontSize:12,textAlign:"center",cursor:"pointer"}}>
-                ð¸ Add Photo ({(it.photos||[]).length})
+                📸 Add Photo ({(it.photos||[]).length})
                 <input type="file" accept="image/*" capture="environment" onChange={e=>addPhoto(e.target.files?.[0],i)} style={{display:"none"}}/>
               </label>
             </div>
@@ -1287,7 +1287,7 @@ export default function Walkthrough() {
                   </div>
                   <div style={{textAlign:"right",flexShrink:0}}>
                     <div style={{fontSize:13,fontWeight:800,color:item.asking_price?"#16a34a":"#94a3b8"}}>{item.asking_price?`$${parseFloat(item.asking_price).toFixed(0)}`:""}</div>
-                    <div style={{fontSize:9,color:"#94a3b8"}}>{isExp?"â¾":"â¸"}</div>
+                    <div style={{fontSize:9,color:"#94a3b8"}}>{isExp?"▾":"▸"}</div>
                   </div>
                 </div>
                 {/* Location + SKU badges */}
