@@ -137,7 +137,7 @@ export default function CompPanel({ item }) {
         borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#1e293b",
       }}>
         <span>
-          <span style={{ marginRight: 6 }}>📊</span>
+          <span style={{ marginRight: 6 }}>[=]</span>
           Market Comps
           {recommended && <span style={{ marginLeft: 8, color: "#059669", fontFamily: "monospace" }}>~${recommended.toLocaleString()}</span>}
           {ebay?.stats && <span style={{ marginLeft: 6, fontSize: 11, color: "#94a3b8" }}>({ebay.stats.count} eBay)</span>}
@@ -226,7 +226,7 @@ export default function CompPanel({ item }) {
               ].map(s => (
                 <a key={s.l} href={s.u} target="_blank" rel="noopener noreferrer"
                   style={{ padding: "6px 12px", background: "#f1f5f9", color: "#3b82f6", borderRadius: 4, fontSize: 12, textDecoration: "none", border: "1px solid #e2e8f0" }}>
-                  {s.l} ↗
+                  {s.l} ->
                 </a>
               ))}
             </div>
