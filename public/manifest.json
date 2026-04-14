@@ -1,12 +1,12 @@
 {
-  "name": "Hardin Walkthrough",
-  "short_name": "Hardin WALK",
-  "description": "Field Walkthrough - Hardin Power Group",
+  "name": "PowerGate | Hardin Electrical",
+  "short_name": "PowerGate",
+  "description": "Equipment intake, comp pricing, inventory management",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#58815a",
-  "orientation": "portrait",
+  "background_color": "#f1f5f9",
+  "theme_color": "#3d5e3f",
+  "orientation": "portrait-primary",
   "icons": [
     { "src": "/icon-72x72.png", "sizes": "72x72", "type": "image/png" },
     { "src": "/icon-96x96.png", "sizes": "96x96", "type": "image/png" },
