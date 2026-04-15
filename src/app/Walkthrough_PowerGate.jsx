@@ -861,7 +861,7 @@ export default function Walkthrough() {
                   {it.disposition&&it.disposition!=="unassigned"&&<span style={{padding:"2px 6px",borderRadius:6,background:(dc[it.disposition]||"#6b7280")+"15",color:dc[it.disposition],fontSize:9,fontWeight:700}}>{it.disposition}</span>}
                 </div>
                 {!expandedItems[i]&&<div style={{fontSize:11,color:"#64748b",marginTop:2}}>
-                  {it.equipmentType||"No type"}{it.manufacturer?` . ${it.manufacturer}`:""}{it.kvaRating?` . ${it.kvaRating}KVA`:""}{it.amperageRating?` . ${it.amperageRating}A`:""}{it.voltageRating?` . ${it.voltageRating}V`:""}{it.serialNumber?` . S/N:${it.serialNumber}`:""}{parseFloat(it.estimatedResale)>0?` . $${parseFloat(it.estimatedResale).toFixed(0)}`:""}{(it.photos||[]).length>0?` . [CAM] ${(it.photos||[]).length}`:""}
+                  {it.equipmentType||"No type"}{it.manufacturer?` . ${it.manufacturer}`:""}{it.kvaRating?` . ${it.kvaRating}KVA`:""}{it.amperageRating?` . ${it.amperageRating}A`:""}{it.voltageRating?` . ${it.voltageRating}V`:""}{it.serialNumber?` . S/N:${it.serialNumber}`:(it.quantity||1)>1?` . Qty:${it.quantity}`:""}{parseFloat(it.estimatedResale)>0?` . $${parseFloat(it.estimatedResale).toFixed(0)}`:""}{(it.photos||[]).length>0?` . [CAM] ${(it.photos||[]).length}`:""}
                 </div>}
               </div>
               <button onClick={e=>{e.stopPropagation();rmItem(i);}} style={{background:"none",border:"none",color:"#ef4444",fontSize:20,cursor:"pointer"}}>&times;</button>
@@ -900,11 +900,20 @@ export default function Walkthrough() {
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Mfr</label><select style={inpSm} value={it.manufacturer} onChange={e=>uItem(i,"manufacturer",e.target.value)}><option value="">Select</option>{MFR.map(m=><option key={m}>{m}</option>)}</select></div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
-              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>S/N</label><input style={inpSm} value={it.serialNumber} onChange={e=>uItem(i,"serialNumber",e.target.value)}/></div>
+              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>S/N</label><input style={inpSm} value={it.serialNumber} onChange={e=>{uItem(i,"serialNumber",e.target.value);if(e.target.value.trim())uItem(i,"quantity",1);}}/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Model</label><input style={inpSm} value={it.modelNumber} onChange={e=>uItem(i,"modelNumber",e.target.value)}/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Amps</label><input style={inpSm} value={it.amperageRating} onChange={e=>uItem(i,"amperageRating",e.target.value)}/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Volts</label><input style={inpSm} value={it.voltageRating} onChange={e=>uItem(i,"voltageRating",e.target.value)}/></div>
             </div>
+
+            {/* Quantity — shown when no serial number (bulk/lot items) */}
+            {!it.serialNumber&&<div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#eff6ff",borderRadius:8,marginBottom:8,border:"1px solid #bfdbfe"}}>
+              <span style={{fontSize:11,fontWeight:700,color:"#1d4ed8",flex:1}}>No S/N — Qty</span>
+              <button onClick={()=>uItem(i,"quantity",Math.max(1,(it.quantity||1)-1))} style={{width:32,height:32,borderRadius:6,border:"1.5px solid #bfdbfe",background:"#fff",fontWeight:800,fontSize:18,cursor:"pointer",lineHeight:1,color:"#1d4ed8"}}>-</button>
+              <input type="number" min="1" value={it.quantity||1} onChange={e=>uItem(i,"quantity",parseInt(e.target.value)||1)} style={{width:56,textAlign:"center",padding:"6px 0",border:"2px solid #2563eb",borderRadius:8,fontSize:18,fontWeight:800,color:"#1d4ed8",background:"#fff"}}/>
+              <button onClick={()=>uItem(i,"quantity",(it.quantity||1)+1)} style={{width:32,height:32,borderRadius:6,border:"1.5px solid #bfdbfe",background:"#fff",fontWeight:800,fontSize:18,cursor:"pointer",lineHeight:1,color:"#1d4ed8"}}>+</button>
+              <span style={{fontSize:10,color:"#6b7280"}}>units</span>
+            </div>}
 
             {/* Specs row 2 */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
@@ -986,9 +995,10 @@ export default function Walkthrough() {
             {/* Pickup destination (in pickup mode) */}
             {mode==="pickup"&&<div style={{marginBottom:8}}>
               <label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Destination</label>
-              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
                 {LOC.map(l=><button key={l.v} onClick={()=>uItem(i,"destination",l.v)} style={{padding:"6px 10px",borderRadius:6,border:`1.5px solid ${it.destination===l.v?"#2563eb":"#e2e8f0"}`,background:it.destination===l.v?"#2563eb15":"#fff",color:it.destination===l.v?"#2563eb":"#94a3b8",fontWeight:600,fontSize:10,cursor:"pointer"}}>{l.l}</button>)}
               </div>
+              <ScanInput label="Putaway Location (scan bin/rack barcode)" value={it.putawayLocation} onChange={v=>uItem(i,"putawayLocation",v)} placeholder="e.g. LOC-A1-01"/>
             </div>}
 
             {/* Pricing */}
