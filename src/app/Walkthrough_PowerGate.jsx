@@ -1,6 +1,6 @@
 "use client";
 import CompPanel from "./CompPanel";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 /* -- Logo Components ------------------------------------- */
 const LogoMark = ({ size = 32, color = "#58815a" }) => (
