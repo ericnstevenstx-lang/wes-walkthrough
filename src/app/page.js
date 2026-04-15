@@ -1,2 +1,6 @@
-import Walkthrough from "./Walkthrough";
-export default function Home() { return <Walkthrough />; }
+"use client";
+import Walkthrough from "./Walkthrough_PowerGate";
+ 
+export default function Page() {
+  return <Walkthrough />;
+}
