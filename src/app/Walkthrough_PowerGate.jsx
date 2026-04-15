@@ -102,35 +102,86 @@ function compressImage(file,maxW=1200,quality=0.7){
 }
 
 /* -- Barcode Scanner ------------------------------------ */
+/* Supports Code 39, Code 128 / UCC-128, EAN, QR.
+   Uses native BarcodeDetector on Chrome/Android.
+   Falls back to Quagga2 on iOS Safari and Firefox.      */
 function BarcodeScanner({onScan,onClose,label}){
-  const videoRef=useState(null);
+  const videoRef=useRef(null);
+  const containerRef=useRef(null);
   const [err,setErr]=useState(null);
-  const [active,setActive]=useState(true);
+  const [ready,setReady]=useState(false);
+  const [useQuagga,setUseQuagga]=useState(false);
+
   useEffect(()=>{
-    let stream=null;let animId=null;let detector=null;
-    const start=async()=>{
-      try{
-        if(typeof BarcodeDetector!=="undefined")detector=new BarcodeDetector({formats:["code_128","code_39","ean_13","ean_8","qr_code","upc_a","upc_e","codabar","itf"]});
-        stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}}});
-        if(videoRef[0])videoRef[0].srcObject=stream;
-        const scan=async()=>{
-          if(!active||!videoRef[0]||videoRef[0].readyState<2){animId=requestAnimationFrame(scan);return;}
-          if(detector){try{const codes=await detector.detect(videoRef[0]);if(codes.length>0){onScan(codes[0].rawValue);cleanup();return;}}catch{}}
-          animId=requestAnimationFrame(scan);
-        };
-        scan();
-      }catch(e){setErr("Camera access denied. Enter manually.");}
+    let stream=null,animId=null,quaggaOn=false;
+    const cleanup=()=>{
+      if(stream)stream.getTracks().forEach(t=>t.stop());
+      if(animId)cancelAnimationFrame(animId);
+      if(quaggaOn&&window.Quagga){try{window.Quagga.stop();window.Quagga.offDetected();}catch{}}
     };
-    const cleanup=()=>{if(stream)stream.getTracks().forEach(t=>t.stop());if(animId)cancelAnimationFrame(animId);};
-    start();return cleanup;
+
+    if(typeof BarcodeDetector!=="undefined"){
+      /* ---- Native path (Chrome Android, desktop Chrome) ---- */
+      const det=new BarcodeDetector({formats:["code_128","code_39","ean_13","ean_8","qr_code","upc_a","upc_e","codabar","itf","data_matrix"]});
+      (async()=>{
+        try{
+          stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1920},height:{ideal:1080}}});
+          if(videoRef.current){videoRef.current.srcObject=stream;setReady(true);}
+          const scan=async()=>{
+            if(!videoRef.current||videoRef.current.readyState<2){animId=requestAnimationFrame(scan);return;}
+            try{const r=await det.detect(videoRef.current);if(r.length>0){onScan(r[0].rawValue);cleanup();return;}}catch{}
+            animId=requestAnimationFrame(scan);
+          };
+          scan();
+        }catch{setErr("Camera access denied. Enter manually.");}
+      })();
+    }else{
+      /* ---- Quagga2 fallback (iOS Safari, Firefox) ----------- */
+      setUseQuagga(true);
+      (async()=>{
+        try{
+          if(!window.Quagga){
+            await new Promise((res,rej)=>{
+              const s=document.createElement("script");
+              s.src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/lib/quagga.min.js";
+              s.onload=res;s.onerror=rej;
+              document.head.appendChild(s);
+            });
+          }
+          await new Promise((res,rej)=>{
+            window.Quagga.init({
+              inputStream:{type:"LiveStream",target:containerRef.current,
+                constraints:{facingMode:"environment",width:1280,height:720}},
+              decoder:{readers:["code_128_reader","code_39_reader","ean_reader","upc_reader","upc_e_reader","codabar_reader"]},
+              locate:true,
+            },e=>e?rej(e):res());
+          });
+          quaggaOn=true;
+          window.Quagga.start();
+          setReady(true);
+          window.Quagga.onDetected(r=>{
+            const code=r?.codeResult?.code;
+            if(code){onScan(code);cleanup();}
+          });
+        }catch(e){setErr("Scanner unavailable. Enter location manually.");}
+      })();
+    }
+    return cleanup;
   },[]);
+
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.9)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-      <div style={{color:"#fff",fontSize:14,fontWeight:700,marginBottom:12}}>{label||"Scan Barcode"}</div>
-      {err?<div style={{color:"#fca5a5",fontSize:13,padding:20,textAlign:"center"}}>{err}</div>:
-        <video ref={el=>videoRef[0]=el} autoPlay playsInline muted style={{width:"90%",maxWidth:400,borderRadius:12,border:"3px solid #2563eb"}}/>}
-      <div style={{marginTop:16,display:"flex",gap:8}}>
-        <button onClick={onClose} style={{padding:"12px 24px",borderRadius:8,border:"none",background:"#dc2626",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>Cancel</button>
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{color:"#fff",fontSize:14,fontWeight:700,marginBottom:8}}>{label||"Scan Barcode"}</div>
+      <div style={{color:"#94a3b8",fontSize:11,marginBottom:12}}>Code 39 · Code 128 · UCC-128 · EAN · QR</div>
+      {err
+        ?<div style={{color:"#fca5a5",fontSize:13,padding:20,textAlign:"center"}}>{err}</div>
+        :useQuagga
+          ?<div ref={containerRef} style={{width:"90%",maxWidth:400,borderRadius:12,overflow:"hidden",border:"3px solid #2563eb",minHeight:200,background:"#000"}}/>
+          :<video ref={videoRef} autoPlay playsInline muted style={{width:"90%",maxWidth:400,borderRadius:12,border:"3px solid #2563eb"}}/>
+      }
+      {!ready&&!err&&<div style={{color:"#94a3b8",fontSize:12,marginTop:12}}>Starting camera...</div>}
+      <div style={{marginTop:16}}>
+        <button onClick={onClose} style={{padding:"12px 28px",borderRadius:8,border:"none",background:"#dc2626",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>Cancel</button>
       </div>
     </div>
   );
@@ -159,6 +210,7 @@ export default function Walkthrough() {
   const [sv,setSv]=useState(false);
   const [scanning,setScanning]=useState(false);
   const [scanImg,setScanImg]=useState(null);
+  const [catalogScanIdx,setCatalogScanIdx]=useState(null);
   const [msg,setMsg]=useState(null);
   const [expId,setExpId]=useState(null);
   const [priceBook,setPriceBook]=useState([]);
@@ -351,7 +403,7 @@ export default function Walkthrough() {
     ebayCompAvg:0,priceBookValue:0,estimatedWeight:0,
     conditionNotes:"",photos:[],missing:[],breakers:[],
     acquisitionCost:"",refurbCost:"",askingPrice:"",
-    barcodeSku:"",putawayLocation:"",skidId:"",
+    barcodeSku:"",putawayLocation:"",putawayQty:1,skidId:"",
     // Pickup fields
     pickupStatus:"pending",destination:"main_warehouse",
   }]);
@@ -881,10 +933,7 @@ export default function Walkthrough() {
             </div>
             {/* Barcode / QR Scanner */}
             <div style={{display:"flex",gap:6,marginBottom:8}}>
-              <button onClick={()=>{
-                const ov=document.createElement("div");ov.id="bc_"+i;ov.innerHTML='<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center"><div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:14px">Scan Barcode / QR</div><video autoplay playsinline muted style="width:90%;max-width:400px;border-radius:12px;border:3px solid #d97706"></video><div style="margin-top:16px"><button id="bc_x_'+i+'" style="padding:12px 28px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-weight:700;font-size:14px;cursor:pointer">Cancel</button></div></div>';document.body.appendChild(ov);
-                (async()=>{try{const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}}});const el=document.getElementById("bc_"+i);if(!el){st.getTracks().forEach(t=>t.stop());return;}const vid=el.querySelector("video");vid.srcObject=st;const cls=()=>{st.getTracks().forEach(t=>t.stop());const e=document.getElementById("bc_"+i);if(e)e.remove();};el.querySelector("#bc_x_"+i).onclick=cls;if(typeof BarcodeDetector!=="undefined"){const det=new BarcodeDetector({formats:["code_128","code_39","ean_13","ean_8","qr_code","upc_a","upc_e"]});const tick=async()=>{if(!vid||vid.readyState<2){requestAnimationFrame(tick);return;}try{const r=await det.detect(vid);if(r.length){cls();const v=r[0].rawValue;setItems(prev=>prev.map((it2,j)=>j===i?{...it2,catalogNumber:v,modelNumber:v}:it2));setMsg({t:"success",m:"Scanned: "+v});return;}}catch{}requestAnimationFrame(tick);};tick();}}catch(e){setMsg({t:"error",m:"Camera: "+e.message});const el=document.getElementById("bc_"+i);if(el)el.remove();}})();
-              }} style={{flex:1,padding:8,borderRadius:8,border:"1.5px solid #d97706",background:"#fff7ed",color:"#92400e",fontWeight:700,fontSize:11,cursor:"pointer",textAlign:"center"}}>
+              <button onClick={()=>setCatalogScanIdx(i)} style={{flex:1,padding:8,borderRadius:8,border:"1.5px solid #d97706",background:"#fff7ed",color:"#92400e",fontWeight:700,fontSize:11,cursor:"pointer",textAlign:"center"}}>
                 Barcode / QR
               </button>
             </div>
@@ -999,6 +1048,13 @@ export default function Walkthrough() {
                 {LOC.map(l=><button key={l.v} onClick={()=>uItem(i,"destination",l.v)} style={{padding:"6px 10px",borderRadius:6,border:`1.5px solid ${it.destination===l.v?"#2563eb":"#e2e8f0"}`,background:it.destination===l.v?"#2563eb15":"#fff",color:it.destination===l.v?"#2563eb":"#94a3b8",fontWeight:600,fontSize:10,cursor:"pointer"}}>{l.l}</button>)}
               </div>
               <ScanInput label="Putaway Location (scan bin/rack barcode)" value={it.putawayLocation} onChange={v=>uItem(i,"putawayLocation",v)} placeholder="e.g. LOC-A1-01"/>
+              {(it.quantity||1)>1&&<div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#f0fdf4",borderRadius:8,marginTop:8,border:"1px solid #bbf7d0"}}>
+                <span style={{fontSize:11,fontWeight:700,color:"#15803d",flex:1}}>Putaway Qty</span>
+                <button onClick={()=>uItem(i,"putawayQty",Math.max(1,(it.putawayQty||it.quantity||1)-1))} style={{width:30,height:30,borderRadius:6,border:"1.5px solid #bbf7d0",background:"#fff",fontWeight:800,fontSize:16,cursor:"pointer",color:"#15803d"}}>-</button>
+                <input type="number" min="1" max={it.quantity||1} value={it.putawayQty||it.quantity||1} onChange={e=>uItem(i,"putawayQty",Math.min(it.quantity||1,parseInt(e.target.value)||1))} style={{width:52,textAlign:"center",padding:"4px 0",border:"2px solid #16a34a",borderRadius:6,fontSize:16,fontWeight:800,color:"#15803d"}}/>
+                <button onClick={()=>uItem(i,"putawayQty",Math.min(it.quantity||1,(it.putawayQty||it.quantity||1)+1))} style={{width:30,height:30,borderRadius:6,border:"1.5px solid #bbf7d0",background:"#fff",fontWeight:800,fontSize:16,cursor:"pointer",color:"#15803d"}}>+</button>
+                <span style={{fontSize:10,color:"#6b7280"}}>of {it.quantity}</span>
+              </div>}
             </div>}
 
             {/* Pricing */}
@@ -1080,10 +1136,28 @@ export default function Walkthrough() {
                 <ScanInput label="Putaway Location" value={it.putawayLocation} onChange={v=>uItem(i,"putawayLocation",v)} placeholder="Scan bin/rack..."/>
                 <ScanInput label="SKU / Barcode" value={it.barcodeSku} onChange={v=>uItem(i,"barcodeSku",v)} placeholder="Scan or assign..."/>
               </div>
+              {(it.quantity||1)>1&&<div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#f0fdf4",borderRadius:8,marginTop:8,border:"1px solid #bbf7d0"}}>
+                <span style={{fontSize:11,fontWeight:700,color:"#15803d",flex:1}}>Putaway Qty</span>
+                <button onClick={()=>uItem(i,"putawayQty",Math.max(1,(it.putawayQty||it.quantity||1)-1))} style={{width:30,height:30,borderRadius:6,border:"1.5px solid #bbf7d0",background:"#fff",fontWeight:800,fontSize:16,cursor:"pointer",color:"#15803d"}}>-</button>
+                <input type="number" min="1" max={it.quantity||1} value={it.putawayQty||it.quantity||1} onChange={e=>uItem(i,"putawayQty",Math.min(it.quantity||1,parseInt(e.target.value)||1))} style={{width:52,textAlign:"center",padding:"4px 0",border:"2px solid #16a34a",borderRadius:6,fontSize:16,fontWeight:800,color:"#15803d"}}/>
+                <button onClick={()=>uItem(i,"putawayQty",Math.min(it.quantity||1,(it.putawayQty||it.quantity||1)+1))} style={{width:30,height:30,borderRadius:6,border:"1.5px solid #bbf7d0",background:"#fff",fontWeight:800,fontSize:16,cursor:"pointer",color:"#15803d"}}>+</button>
+                <span style={{fontSize:10,color:"#6b7280"}}>of {it.quantity}</span>
+              </div>}
             </div>}
             </>}
           </div>
         ))}
+
+        {/* Catalog barcode scanner modal */}
+        {catalogScanIdx!==null&&<BarcodeScanner
+          label="Scan Catalog / Model Barcode"
+          onScan={v=>{
+            setItems(prev=>prev.map((it,j)=>j===catalogScanIdx?{...it,catalogNumber:v,modelNumber:v}:it));
+            setMsg({t:"success",m:"Scanned: "+v});
+            setCatalogScanIdx(null);
+          }}
+          onClose={()=>setCatalogScanIdx(null)}
+        />}
 
         {/* Summary (walkthrough/pickup only) */}
         {mode!=="receive"&&items.length>0&&<div style={{...card,background:meetsMargin?"#ecfdf5":"#fef2f2",border:`2px solid ${meetsMargin?"#a7f3d0":"#fecaca"}`}}>
