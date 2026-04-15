@@ -1,5 +1,3 @@
-import "./globals.css";
-
 export const metadata = {
   title: "PowerGate | Hardin",
   description: "Equipment intake, comp pricing, and inventory management",
