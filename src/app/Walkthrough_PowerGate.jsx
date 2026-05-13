@@ -269,7 +269,7 @@ export default function Walkthrough() {
   const [qcPhase,setQcPhase]=useState("location"); // location | capture | analyzing | review | saving
   const [qcLocationCode,setQcLocationCode]=useState(""); // free-text location from existing sticker
   const [qcItem,setQcItem]=useState(null);
-  const [qcCount,setQcCount]=useState(0);
+  const [qcSession,setQcSession]=useState([]); // saved rows in this session (for print summary)
   const qcFileRef=useRef(null);
 
   /* -- Load reference data -- */
@@ -524,11 +524,11 @@ export default function Walkthrough() {
         const stored=await sG("wes_inv")||[];
         await sS("wes_inv",[{...invRow,_photo:qcItem.photo,created_at:new Date().toISOString()},...stored]);
       }
-      setQcCount(c=>c+1);
+      setQcSession(prev=>[...prev,{...invRow,_photo:qcItem.photo}]);
       setQcItem(null);
-      setMsg({t:"success",m:`Saved. ${qcCount+1} captured this session.`});
+      setMsg({t:"success",m:`Saved. ${qcSession.length+1} captured this session.`});
       if(then==="finish"){
-        setQcPhase("location");setQcCount(0);setView("inventory");loadInventory();
+        setQcPhase("location");setQcSession([]);setView("inventory");loadInventory();
       }else{
         setQcPhase("capture");
         // Auto-open camera for next item
@@ -540,6 +540,64 @@ export default function Walkthrough() {
     }
   };
 
+  /* -- Print session summary as 8.5x11 paper receipt -- */
+  const printSessionSummary=()=>{
+    if(!qcSession.length){setMsg({t:"error",m:"Nothing to print yet"});return;}
+    const dt=new Date().toLocaleString();
+    const isReceive=mode==="receive";
+    const header=isReceive
+      ? `<div class="meta"><div><strong>Source:</strong> ${job.customerName||"(no source)"}</div><div><strong>PO/Ref:</strong> ${job.jobName||"-"}</div><div><strong>Received by:</strong> ${job.preparedBy||"-"}</div><div><strong>Date:</strong> ${job.bidDate||today()}</div></div>`
+      : `<div class="meta"><div><strong>Location code:</strong> ${qcLocationCode}</div><div><strong>Walked by:</strong> Quick Capture</div><div><strong>Date:</strong> ${today()}</div></div>`;
+    const title=isReceive?"DOCK RECEIPT":"YARD CAPTURE";
+    const rows=qcSession.map((r,i)=>{
+      const photoCell=r._photo?`<img src="${r._photo}" alt="" style="max-width:120px;max-height:120px;object-fit:cover;border:1px solid #ddd"/>`:"<span style='color:#999'>no photo</span>";
+      const idLabel=r.tracking_mode==="quantity"?`Qty ${r.qty}`:`S/N: ${r.serial_number||"UNKNOWN"}`;
+      return `<tr>
+        <td>${i+1}</td>
+        <td>${photoCell}</td>
+        <td><strong>${r.id}</strong><br/><small>${r.equipment_type||""}</small></td>
+        <td>${r.manufacturer||"-"}<br/><small>${r.model_number||r.catalog_number||""}</small></td>
+        <td>${r.amperage_rating?r.amperage_rating+"A":""}${r.voltage_rating?" / "+r.voltage_rating+"V":""}${r.kva_rating?" / "+r.kva_rating+"KVA":""}</td>
+        <td>${r.grade||"C"}</td>
+        <td>${idLabel}</td>
+      </tr>`;
+    }).join("");
+    const html=`<!doctype html><html><head><title>HPG ${title} ${dt}</title>
+<style>
+  @page{size:letter;margin:0.5in}
+  body{font-family:-apple-system,Segoe UI,sans-serif;color:#111;font-size:11px}
+  h1{font-size:18px;margin:0 0 4px 0}
+  .sub{color:#666;margin-bottom:12px;font-size:11px}
+  .meta{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;background:#f5f5f5;padding:10px;border-radius:6px;margin-bottom:14px;font-size:11px}
+  table{width:100%;border-collapse:collapse}
+  th{background:#1e293b;color:#fff;text-align:left;padding:6px 8px;font-size:10px;letter-spacing:0.5px}
+  td{padding:6px 8px;border-bottom:1px solid #ddd;vertical-align:top;font-size:11px}
+  td img{display:block}
+  tr:nth-child(even){background:#fafafa}
+  .footer{margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:24px;font-size:11px}
+  .sig{border-top:1px solid #000;padding-top:4px;margin-top:48px}
+  .total{font-size:14px;margin:8px 0;font-weight:700}
+</style></head><body>
+<h1>HARDIN POWERGATE</h1>
+<div class="sub">${title} . Printed ${dt}</div>
+${header}
+<div class="total">${qcSession.length} item${qcSession.length===1?"":"s"}</div>
+<table>
+  <thead><tr><th>#</th><th>Photo</th><th>INV / Type</th><th>Mfr / Model</th><th>Ratings</th><th>Grade</th><th>Track</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="footer">
+  <div><div class="sig">Receiver signature</div></div>
+  <div><div class="sig">Supervisor signature</div></div>
+</div>
+<script>window.onload=()=>{setTimeout(()=>window.print(),300)}</script>
+</body></html>`;
+    const w=window.open("","_blank","width=900,height=1200");
+    if(!w){setMsg({t:"error",m:"Popup blocked. Allow popups for this site."});return;}
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  };
 
   /* -- Item management -- */
   const addItem=()=>setItems(p=>[...p,{
@@ -1358,10 +1416,10 @@ export default function Walkthrough() {
           <div style={{fontSize:13,fontWeight:700}}>
             {mode==="quick"?<>
               <div>Location: {qcLocationCode}</div>
-              <div style={{fontSize:11,opacity:0.85,marginTop:2}}>{qcCount} captured this session</div>
+              <div style={{fontSize:11,opacity:0.85,marginTop:2}}>{qcSession.length} captured this session</div>
             </>:<>
               <div>From: {job.customerName||"(no source)"}{job.jobName?` . ${job.jobName}`:""}</div>
-              <div style={{fontSize:11,opacity:0.85,marginTop:2}}>Received by {job.preparedBy} . {qcCount} received this session</div>
+              <div style={{fontSize:11,opacity:0.85,marginTop:2}}>Received by {job.preparedBy} . {qcSession.length} received this session</div>
             </>}
           </div>
           <button onClick={()=>setQcPhase("location")} style={{padding:"6px 12px",borderRadius:6,border:"1px solid rgba(255,255,255,0.4)",background:"transparent",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>{mode==="receive"?"Edit info":"Change"}</button>
@@ -1416,7 +1474,8 @@ export default function Walkthrough() {
               </label>
             </div>
           </div>
-          <button onClick={()=>{setQcPhase("location");setQcCount(0);setView("inventory");loadInventory();}} style={{width:"100%",boxSizing:"border-box",padding:14,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#475569",fontSize:14,fontWeight:700,cursor:"pointer"}}>Finish session . View inventory</button>
+          {qcSession.length>0&&<button onClick={printSessionSummary} style={{width:"100%",boxSizing:"border-box",padding:14,borderRadius:10,border:`2px solid ${mode==="receive"?"#16a34a":"#0891b2"}`,background:"#fff",color:mode==="receive"?"#16a34a":"#0891b2",fontSize:14,fontWeight:700,cursor:"pointer",marginBottom:8}}>Print Session Summary ({qcSession.length} item{qcSession.length===1?"":"s"})</button>}
+          <button onClick={()=>{setQcPhase("location");setQcSession([]);setView("inventory");loadInventory();}} style={{width:"100%",boxSizing:"border-box",padding:14,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#475569",fontSize:14,fontWeight:700,cursor:"pointer"}}>Finish session . View inventory</button>
         </div>}
 
         {/* PHASE: ANALYZING */}
