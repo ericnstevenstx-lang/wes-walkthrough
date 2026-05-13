@@ -38,20 +38,20 @@ const SplashScreen = ({ onDone }) => {
   );
 };
 
-
-
 /* -- Supabase -------------------------------------------- */
 const SB="https://ulyycjtrshpsjpvbztkr.supabase.co";
 const SK="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVseXljanRyc2hwc2pwdmJ6dGtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMzg1NzAsImV4cCI6MjA5MDcxNDU3MH0.UYwCdYrdy20xl_hCkO8t4CAB16vBHj-oMdflDv1XlVE";
 const H={apikey:SK,Authorization:`Bearer ${SK}`,"Content-Type":"application/json",Prefer:"return=representation"};
 let loc=false;
 async function dbF(p,o={}){const r=await fetch(`${SB}/rest/v1/${p}`,{...o,headers:{...H,...(o.headers||{})}});if(!r.ok)throw new Error(`${r.status}`);const t=await r.text();return t?JSON.parse(t):null;}
+async function hpgF(p,o={}){const isWrite=o.method&&o.method!=="GET";const profKey=isWrite?"Content-Profile":"Accept-Profile";return dbF(p,{...o,headers:{...(o.headers||{}),[profKey]:"hpg"}});}
 async function sG(k){try{if(typeof window!=="undefined"&&window.storage){const r=await window.storage.get(k);return r?JSON.parse(r.value):null;}}catch{}return null;}
 async function sS(k,v){try{if(typeof window!=="undefined"&&window.storage)await window.storage.set(k,JSON.stringify(v));}catch{}}
 
 /* -- Constants ------------------------------------------- */
 const EQ=["Switchgear","Panelboard","Transformer","Circuit Breaker","Motor Control Center (MCC)","Bus Duct","Disconnect Switch","UPS System","PDU","RPP (Remote Power Panel)","ATS / Transfer Switch","VFD / Drive","Motor Starter","Control Transformer","Trip Unit","Relay","CT / PT","Meter","Bin Breaker","Mounting Kit","Gasket","Bus Bar","Wire","Inner","Nuts and Bolts","Other"];
 const BULK_TYPES=new Set(["Bin Breaker","Mounting Kit","Gasket","Bus Bar","Wire","Inner","Nuts and Bolts"]);
+const ENUM_PARENT_TYPES=new Set(["Motor Control Center (MCC)","Switchgear","Panelboard"]);
 const MFR=["Eaton / Cutler-Hammer","Siemens","Square D / Schneider","ABB","GE","Westinghouse","ITE","Federal Pacific","Allen-Bradley / Rockwell","Mitsubishi","Yaskawa","Danfoss","Liebert / Vertiv","APC / Schneider","ABL Sursum","Other"];
 const GRD=[{v:"A",c:"#16a34a",d:"Excellent"},{v:"B",c:"#2563eb",d:"Good"},{v:"C",c:"#f59e0b",d:"Fair"},{v:"D",c:"#dc2626",d:"Scrap"}];
 const gc={};GRD.forEach(g=>gc[g.v]=g.c);
@@ -64,6 +64,7 @@ const NEMA=[{v:"1",d:"Indoor General"},{v:"3R",d:"Outdoor Rain"},{v:"3",d:"Outdo
 const PHASE=["1","3"];
 const WINDING=[{v:"",l:"N/A"},{v:"CU",l:"Copper"},{v:"AL",l:"Aluminum"}];
 const today=()=>new Date().toISOString().slice(0,10);
+const newInvId=()=>`INV-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,5)}`;
 
 /* -- Styles ----------------------------------------------- */
 const inp={width:"100%",padding:"12px 14px",border:"1.5px solid #d1d5db",borderRadius:10,fontSize:16,background:"#fff",color:"#111",boxSizing:"border-box",outline:"none",fontFamily:"inherit",WebkitAppearance:"none"};
@@ -103,9 +104,6 @@ function compressImage(file,maxW=1200,quality=0.7){
 }
 
 /* -- Barcode Scanner ------------------------------------ */
-/* Supports Code 39, Code 128 / UCC-128, EAN, QR.
-   Uses native BarcodeDetector on Chrome/Android.
-   Falls back to Quagga2 on iOS Safari and Firefox.      */
 function BarcodeScanner({onScan,onClose,label}){
   const videoRef=useRef(null);
   const containerRef=useRef(null);
@@ -122,7 +120,6 @@ function BarcodeScanner({onScan,onClose,label}){
     };
 
     if(typeof BarcodeDetector!=="undefined"){
-      /* ---- Native path (Chrome Android, desktop Chrome) ---- */
       const det=new BarcodeDetector({formats:["code_128","code_39","ean_13","ean_8","qr_code","upc_a","upc_e","codabar","itf","data_matrix"]});
       (async()=>{
         try{
@@ -137,7 +134,6 @@ function BarcodeScanner({onScan,onClose,label}){
         }catch{setErr("Camera access denied. Enter manually.");}
       })();
     }else{
-      /* ---- Quagga2 fallback (iOS Safari, Firefox) ----------- */
       setUseQuagga(true);
       (async()=>{
         try{
@@ -173,7 +169,7 @@ function BarcodeScanner({onScan,onClose,label}){
   return(
     <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}}>
       <div style={{color:"#fff",fontSize:14,fontWeight:700,marginBottom:8}}>{label||"Scan Barcode"}</div>
-      <div style={{color:"#94a3b8",fontSize:11,marginBottom:12}}>Code 39 · Code 128 · UCC-128 · EAN · QR</div>
+      <div style={{color:"#94a3b8",fontSize:11,marginBottom:12}}>Code 39 . Code 128 . UCC-128 . EAN . QR</div>
       {err
         ?<div style={{color:"#fca5a5",fontSize:13,padding:20,textAlign:"center"}}>{err}</div>
         :useQuagga
@@ -188,7 +184,7 @@ function BarcodeScanner({onScan,onClose,label}){
   );
 }
 
-/* -- Scan Input (text field + scan button) -------------- */
+/* -- Scan Input -------- */
 function ScanInput({value,onChange,placeholder,label,style:st}){
   const [scanning,setScanning]=useState(false);
   return(
@@ -205,7 +201,7 @@ function ScanInput({value,onChange,placeholder,label,style:st}){
 export default function Walkthrough() {
   const [showSplash,setShowSplash]=useState(true);
   const [view,setView]=useState("jobs");
-  const [mode,setMode]=useState("walkthrough"); // walkthrough | pickup | intake
+  const [mode,setMode]=useState("walkthrough");
   const [jobs,setJobs]=useState([]);
   const [ld,setLd]=useState(false);
   const [sv,setSv]=useState(false);
@@ -220,7 +216,6 @@ export default function Walkthrough() {
   const [expandedItems,setExpandedItems]=useState({});
   const toggleItem=(i)=>setExpandedItems(p=>({...p,[i]:!p[i]}));
 
-  /* -- Inventory browse state -- */
   const [inv,setInv]=useState([]);
   const [invLoading,setInvLoading]=useState(false);
   const [invSearch,setInvSearch]=useState("");
@@ -246,33 +241,29 @@ export default function Walkthrough() {
   const loadInventory=useCallback(async()=>{
     setInvLoading(true);
     try{
-      if(!loc){
-        const data=await dbF("inventory_items?select=*&order=created_at.desc&limit=200");
-        if(data)setInv(data);
-      }else{
-        const local=await sG("wes_inventory");
-        if(local)setInv(local);
-      }
+      if(!loc){const data=await dbF("inventory_items?select=*&order=created_at.desc&limit=200");if(data)setInv(data);}
+      else{const local=await sG("wes_inventory");if(local)setInv(local);}
     }catch{}
     setInvLoading(false);
   },[]);
 
-  /* -- Job form -- */
-  const [job,setJob]=useState({
-    jobName:"",customerName:"",siteAddress:"",preparedBy:"",bidDate:today(),
-    laborHours:"",laborRate:"75",transportCost:"",targetMargin:"45",notes:"",
-  });
+  const [job,setJob]=useState({jobName:"",customerName:"",siteAddress:"",preparedBy:"",bidDate:today(),laborHours:"",laborRate:"75",transportCost:"",targetMargin:"45",notes:""});
   const [items,setItems]=useState([]);
   const [errs,setErrs]=useState({});
 
-  /* -- Quick Capture mode -- */
-  const [qcPhase,setQcPhase]=useState("location"); // location | capture | analyzing | review | saving
-  const [qcLocationCode,setQcLocationCode]=useState(""); // free-text location from existing sticker
+  const [qcPhase,setQcPhase]=useState("location");
+  const [qcLocationCode,setQcLocationCode]=useState("");
   const [qcItem,setQcItem]=useState(null);
-  const [qcSession,setQcSession]=useState([]); // saved rows in this session (for print summary)
+  const [qcSession,setQcSession]=useState([]);
   const qcFileRef=useRef(null);
 
-  /* -- Load reference data -- */
+  /* -- Decomm Enumeration state -- */
+  const [enumComponents,setEnumComponents]=useState([]);
+  const [enumParentObs,setEnumParentObs]=useState(null);
+  const [enumPhoto,setEnumPhoto]=useState(null);
+  const [enumLastTraveler,setEnumLastTraveler]=useState(null);
+  const enumFileRef=useRef(null);
+
   useEffect(()=>{(async()=>{
     try{if(!loc){
       const[pb,wt]=await Promise.all([dbF("price_book?select=*"),dbF("equipment_weights?select=*")]);
@@ -282,18 +273,15 @@ export default function Walkthrough() {
     try{const sk=await dbF("skid_builds?select=*&status=eq.building&order=created_at.desc");if(sk)setSkids(sk);}catch{}
   })();},[]);
 
-  /* -- Load jobs -- */
   const loadJobs=useCallback(async()=>{
     setLd(true);
-    try{if(!loc){const d=await dbF("bids?select=*,bid_line_items(*)&order=created_at.desc");if(d){setJobs(d.map(r=>({...r,items:r.bid_line_items||[]}))); setLd(false);return;}}}catch{loc=true;}
+    try{if(!loc){const d=await dbF("bids?select=*,bid_line_items(*)&order=created_at.desc");if(d){setJobs(d.map(r=>({...r,items:r.bid_line_items||[]})));setLd(false);return;}}}catch{loc=true;}
     setJobs(await sG("wes_wt")||[]);setLd(false);
   },[]);
   useEffect(()=>{loadJobs();},[loadJobs]);
 
-  /* -- Helpers -- */
   const uf=(k,v)=>{setJob(p=>({...p,[k]:v}));if(errs[k])setErrs(p=>({...p,[k]:undefined}));};
 
-  /* -- Price lookup -- */
   const lookupPrice=(eqType,grade,amp)=>{
     const m=priceBook.filter(p=>{
       if(p.equipment_type!==eqType||p.grade!==grade)return false;
@@ -317,7 +305,6 @@ export default function Walkthrough() {
     return Math.round((lbs*(parseFloat(wt.copper_pct)||0)/100*(scrapPrices.copper_2||3.4)+lbs*(parseFloat(wt.aluminum_pct)||0)/100*(scrapPrices.aluminum_clean||0.75)+lbs*(parseFloat(wt.steel_pct)||0)/100*(scrapPrices.steel_clean||0.08))*100)/100;
   };
 
-  /* -- OCR -- */
   const handleScan=async(file,idx)=>{
     if(!file)return;setScanning(true);setMsg(null);
     try{
@@ -326,25 +313,20 @@ export default function Walkthrough() {
       const resp=await fetch(`${SB}/functions/v1/scan-nameplate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image_base64:b64,media_type:file.type})});
       if(!resp.ok)throw new Error(`${resp.status}`);
       const p=await resp.json();if(p.error)throw new Error(p.error);
-      // Fuzzy match manufacturer
       const mfrMatch=MFR.find(m=>{
         if(!p.manufacturer)return false;
         const raw=p.manufacturer.toLowerCase().trim();
         const parts=m.toLowerCase().split(/[\/\s]+/);
         return parts.some(part=>part.length>2&&raw.includes(part))||raw.includes(m.toLowerCase());
       });
-      // Determine if KVA is the primary rating (transformers)
       const isTransformer=p.equipment_type&&p.equipment_type.toLowerCase().includes("transformer");
       const kva=p.kva_rating||(isTransformer?p.amperage_rating:null);
       const amps=isTransformer?null:(p.amperage_rating||null);
-      // Winding: use combined or HV/LV split
       const whv=p.winding_hv||null;
       const wlv=p.winding_lv||null;
       let winding=p.winding_material||null;
       if(!winding&&whv)winding=whv===wlv?whv:`${whv}/${wlv}`;
-      // Weight from nameplate
       const npWeight=p.weight_lbs?parseFloat(String(p.weight_lbs).replace(/[^0-9.]/g,"")):(p.core_coil_weight_lbs?parseFloat(String(p.core_coil_weight_lbs).replace(/[^0-9.]/g,"")):null);
-      // Cooling class determines oil vs dry
       const cooling=p.cooling_class||null;
       const liquid=p.liquid_type||(cooling&&(cooling.startsWith("OA")||cooling.startsWith("O"))?"OIL":cooling&&(cooling.startsWith("AA")||cooling==="dry")?"DRY":null);
 
@@ -385,11 +367,9 @@ export default function Walkthrough() {
     finally{setScanning(false);}
   };
 
-  /* -- Photo upload -- */
   const addPhoto=async(file,idx)=>{
     if(!file)return;
     const compressed=await compressImage(file);
-    // Upload to Supabase Storage
     let photoUrl=compressed;
     try{
       const blob=await(await fetch(compressed)).blob();
@@ -400,14 +380,12 @@ export default function Walkthrough() {
     setItems(prev=>prev.map((it,i)=>i===idx?{...it,photos:[...(it.photos||[]),photoUrl]}:it));
   };
 
-  /* -- Quick Capture: scan handler -- */
   const handleQuickScan=async(file)=>{
     if(!file)return;
     setQcPhase("analyzing");setMsg(null);
     try{
       const compressed=await compressImage(file);
       const b64=compressed.split(",")[1];
-      // Upload photo to storage (parallel with AI call)
       let photoUrl=compressed;
       const upPromise=(async()=>{
         try{
@@ -417,13 +395,11 @@ export default function Walkthrough() {
           if(upResp.ok)photoUrl=`${SB}/storage/v1/object/public/item-photos/${fname}`;
         }catch{}
       })();
-      // AI scan
       const resp=await fetch(`${SB}/functions/v1/scan-nameplate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image_base64:b64,media_type:"image/jpeg"})});
       if(!resp.ok)throw new Error(`AI ${resp.status}`);
       const p=await resp.json();
       if(p.error)throw new Error(p.error);
       await upPromise;
-      // Fuzzy-match mfr and eq type against known lists
       const mfrMatch=MFR.find(m=>{
         if(!p.manufacturer)return false;
         const raw=p.manufacturer.toLowerCase().trim();
@@ -445,8 +421,8 @@ export default function Walkthrough() {
         yearMfg:p.year_manufactured||"",
         grade:"C",
         qty:parseInt(p.quantity_visible)||1,
-        bulkOverride:null, // null=auto (type-based), true=force bulk, false=force serialized
-        _ai:p, // keep raw AI output for attribute writes
+        bulkOverride:null,
+        _ai:p,
       });
       setQcPhase("review");
     }catch(e){
@@ -455,56 +431,39 @@ export default function Walkthrough() {
     }
   };
 
-  /* -- Capture-Receive: write to inventory_items (used by both Quick + Receive modes) -- */
   const handleQuickReceive=async(then)=>{
     if(!qcItem){setMsg({t:"error",m:"No item to save"});return;}
-    if(mode==="quick"&&!qcLocationCode.trim()){
-      setMsg({t:"error",m:"Set location first"});setQcPhase("location");return;
-    }
-    if(mode==="receive"&&!job.preparedBy.trim()){
-      setMsg({t:"error",m:"Received By required"});setQcPhase("location");return;
-    }
+    if(mode==="quick"&&!qcLocationCode.trim()){setMsg({t:"error",m:"Set location first"});setQcPhase("location");return;}
+    if(mode==="receive"&&!job.preparedBy.trim()){setMsg({t:"error",m:"Received By required"});setQcPhase("location");return;}
     if(!qcItem.equipmentType){setMsg({t:"error",m:"Pick an equipment type"});return;}
     setQcPhase("saving");
     try{
-      const invId=`INV-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,5)}`;
+      const invId=newInvId();
       const isBulk=qcItem.bulkOverride!==null?qcItem.bulkOverride:BULK_TYPES.has(qcItem.equipmentType);
       const sn=(qcItem.serialNumber||"").trim();
       const p=qcItem._ai||{};
       const invRow={
-        id:invId,
-        tracking_mode:isBulk?"quantity":"serialized",
+        id:invId,tracking_mode:isBulk?"quantity":"serialized",
         qty:isBulk?(parseInt(qcItem.qty)||1):1,
         serial_number:isBulk?null:(sn||"UNKNOWN"),
-        model_number:qcItem.modelNumber||null,
-        catalog_number:qcItem.catalogNumber||null,
-        manufacturer:qcItem.manufacturer||null,
-        equipment_type:qcItem.equipmentType,
-        voltage_rating:qcItem.voltageRating||null,
-        amperage_rating:qcItem.amperageRating||null,
-        grade:qcItem.grade||"C",
-        location:"main_warehouse",
+        model_number:qcItem.modelNumber||null,catalog_number:qcItem.catalogNumber||null,
+        manufacturer:qcItem.manufacturer||null,equipment_type:qcItem.equipmentType,
+        voltage_rating:qcItem.voltageRating||null,amperage_rating:qcItem.amperageRating||null,
+        grade:qcItem.grade||"C",location:"main_warehouse",
         location_detail:mode==="quick"?qcLocationCode.trim():null,
         customer_origin:mode==="receive"?(job.customerName||null):null,
         source_job_site:mode==="receive"?(job.jobName||null):null,
         status:"received",
         date_received:mode==="receive"?(job.bidDate||today()):today(),
         scanned_by:mode==="receive"?(job.preparedBy||"receive"):"quick_capture",
-        kva_rating:qcItem.kvaRating||null,
-        phase:qcItem.phase||"3",
+        kva_rating:qcItem.kvaRating||null,phase:qcItem.phase||"3",
         year_manufactured:qcItem.yearMfg?parseInt(qcItem.yearMfg)||null:null,
-        frame_size:p.frame_size||null,
-        trip_rating:p.trip_rating||null,
-        interrupting_rating:p.interrupting_rating||null,
-        breaker_type:p.breaker_type||null,
-        bus_rating:p.bus_rating||null,
-        bil_kv:p.bil_kv||null,
-        voltage_class:p.voltage_class||null,
-        cooling_class:p.cooling_class||null,
-        liquid_type:p.liquid_type||null,
-        winding_hv:p.winding_hv||null,
-        winding_lv:p.winding_lv||null,
-        winding_material:p.winding_material||null,
+        frame_size:p.frame_size||null,trip_rating:p.trip_rating||null,
+        interrupting_rating:p.interrupting_rating||null,breaker_type:p.breaker_type||null,
+        bus_rating:p.bus_rating||null,bil_kv:p.bil_kv||null,
+        voltage_class:p.voltage_class||null,cooling_class:p.cooling_class||null,
+        liquid_type:p.liquid_type||null,winding_hv:p.winding_hv||null,
+        winding_lv:p.winding_lv||null,winding_material:p.winding_material||null,
         received_verified:true,
         verified_by:mode==="receive"?(job.preparedBy||"receive"):"quick_capture",
         verified_date:mode==="receive"?(job.bidDate||today()):today(),
@@ -512,35 +471,227 @@ export default function Walkthrough() {
       let ok=false;
       if(!loc){try{
         await dbF("inventory_items",{method:"POST",body:JSON.stringify(invRow)});
-        // Save photo to item_photos if uploaded successfully
         if(qcItem.photo&&qcItem.photo.startsWith(SB)){try{
-          await dbF("item_photos",{method:"POST",body:JSON.stringify({
-            reference_id:invId,reference_type:"inventory_item",photo_url:qcItem.photo,photo_role:"nameplate",is_ebay_ready:false,
-          })});
+          await dbF("item_photos",{method:"POST",body:JSON.stringify({reference_id:invId,reference_type:"inventory_item",photo_url:qcItem.photo,photo_role:"nameplate",is_ebay_ready:false})});
         }catch{}}
         ok=true;
       }catch{loc=true;}}
-      if(!ok){
-        const stored=await sG("wes_inv")||[];
-        await sS("wes_inv",[{...invRow,_photo:qcItem.photo,created_at:new Date().toISOString()},...stored]);
-      }
+      if(!ok){const stored=await sG("wes_inv")||[];await sS("wes_inv",[{...invRow,_photo:qcItem.photo,created_at:new Date().toISOString()},...stored]);}
       setQcSession(prev=>[...prev,{...invRow,_photo:qcItem.photo}]);
       setQcItem(null);
       setMsg({t:"success",m:`Saved. ${qcSession.length+1} captured this session.`});
-      if(then==="finish"){
-        setQcPhase("location");setQcSession([]);setView("inventory");loadInventory();
-      }else{
-        setQcPhase("capture");
-        // Auto-open camera for next item
-        setTimeout(()=>qcFileRef.current?.click(),100);
-      }
+      if(then==="finish"){setQcPhase("location");setQcSession([]);setView("inventory");loadInventory();}
+      else{setQcPhase("capture");setTimeout(()=>qcFileRef.current?.click(),100);}
+    }catch(e){setMsg({t:"error",m:e.message});setQcPhase("review");}
+  };
+
+  /* === DECOMM ENUMERATION === */
+  const startEnumerate=()=>{
+    if(!qcItem)return;
+    if(mode==="quick"&&!qcLocationCode.trim()){setMsg({t:"error",m:"Set location first"});setQcPhase("location");return;}
+    if(mode==="receive"&&!job.preparedBy.trim()){setMsg({t:"error",m:"Received By required"});setQcPhase("location");return;}
+    setEnumComponents([]);setEnumParentObs(null);setEnumPhoto(null);
+    setQcPhase("enumerate_capture");
+    setTimeout(()=>enumFileRef.current?.click(),100);
+  };
+
+  const handleEnumerateCapture=async(file)=>{
+    if(!file)return;
+    setQcPhase("enumerate_analyzing");setMsg(null);
+    try{
+      const compressed=await compressImage(file);
+      const b64=compressed.split(",")[1];
+      let photoUrl=compressed;
+      const upPromise=(async()=>{
+        try{
+          const blob=await(await fetch(compressed)).blob();
+          const fname=`${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
+          const upResp=await fetch(`${SB}/storage/v1/object/item-photos/${fname}`,{method:"POST",headers:{apikey:SK,Authorization:`Bearer ${SK}`,"Content-Type":"image/jpeg"},body:blob});
+          if(upResp.ok)photoUrl=`${SB}/storage/v1/object/public/item-photos/${fname}`;
+        }catch{}
+      })();
+      const resp=await fetch(`${SB}/functions/v1/scan-breaker-lineup`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image_base64:b64,image_media_type:"image/jpeg"})});
+      if(!resp.ok){const txt=await resp.text();throw new Error(`AI ${resp.status}: ${txt.slice(0,120)}`);}
+      const p=await resp.json();
+      if(p.error)throw new Error(p.error);
+      await upPromise;
+      setEnumPhoto(photoUrl);
+      setEnumComponents((p.components||[]).map(c=>({
+        position:c.position||"",
+        equipment_type:c.equipment_type||"Circuit Breaker",
+        manufacturer:c.manufacturer||"",
+        model_or_type:c.model_or_type||"",
+        amperage:c.amperage||"",
+        poles:c.poles||"",
+        voltage:c.voltage||"",
+        notes:c.notes||"",
+        grade:"C",
+      })));
+      setEnumParentObs(p.parent_observations||null);
+      setQcPhase("enumerate_review");
     }catch(e){
-      setMsg({t:"error",m:e.message});
-      setQcPhase("review");
+      setMsg({t:"error",m:"Enumeration scan failed: "+e.message});
+      setQcPhase("enumerate_capture");
     }
   };
 
-  /* -- Print session summary as 8.5x11 paper receipt -- */
+  const addEnumComponent=()=>setEnumComponents(p=>[...p,{position:String(p.length+1),equipment_type:"Circuit Breaker",manufacturer:"",model_or_type:"",amperage:"",poles:"",voltage:"",notes:"",grade:"C"}]);
+  const rmEnumComponent=(i)=>setEnumComponents(p=>p.filter((_,j)=>j!==i));
+  const uEnumComponent=(i,f,v)=>setEnumComponents(p=>p.map((c,j)=>j===i?{...c,[f]:v}:c));
+
+  const handleEnumerateSave=async()=>{
+    if(!qcItem){setMsg({t:"error",m:"No parent item"});return;}
+    if(enumComponents.length===0){setMsg({t:"error",m:"No components to save. Add at least one or cancel."});return;}
+    setQcPhase("enumerate_saving");
+    try{
+      const parentId=newInvId();
+      const sn=(qcItem.serialNumber||"").trim();
+      const p=qcItem._ai||{};
+      const obs=enumParentObs||{};
+      const issuedByLabel=mode==="receive"?(job.preparedBy||"receive"):"quick_capture";
+      const parentRow={
+        id:parentId,tracking_mode:"serialized",qty:1,
+        serial_number:sn||"UNKNOWN",
+        model_number:qcItem.modelNumber||null,catalog_number:qcItem.catalogNumber||null,
+        manufacturer:qcItem.manufacturer||null,equipment_type:qcItem.equipmentType,
+        voltage_rating:qcItem.voltageRating||null,amperage_rating:qcItem.amperageRating||null,
+        grade:qcItem.grade||"C",location:"main_warehouse",
+        location_detail:mode==="quick"?qcLocationCode.trim():null,
+        customer_origin:mode==="receive"?(job.customerName||null):null,
+        source_job_site:mode==="receive"?(job.jobName||null):null,
+        status:"received",physical_state:"on_shelf",parent_id:null,
+        date_received:mode==="receive"?(job.bidDate||today()):today(),
+        scanned_by:issuedByLabel,
+        kva_rating:qcItem.kvaRating||null,phase:qcItem.phase||"3",
+        year_manufactured:qcItem.yearMfg?parseInt(qcItem.yearMfg)||null:null,
+        bus_rating:obs.bus_rating||p.bus_rating||null,
+        voltage_class:obs.voltage_class||p.voltage_class||null,
+        num_sections:obs.visible_sections?(parseInt(String(obs.visible_sections).replace(/\D/g,""))||null):(p.num_sections||null),
+        received_verified:true,verified_by:issuedByLabel,
+        verified_date:mode==="receive"?(job.bidDate||today()):today(),
+      };
+      await dbF("inventory_items",{method:"POST",body:JSON.stringify(parentRow)});
+
+      if(qcItem.photo&&qcItem.photo.startsWith(SB)){try{
+        await dbF("item_photos",{method:"POST",body:JSON.stringify({reference_id:parentId,reference_type:"inventory_item",photo_url:qcItem.photo,photo_role:"nameplate",is_ebay_ready:false})});
+      }catch{}}
+      if(enumPhoto&&enumPhoto.startsWith(SB)){try{
+        await dbF("item_photos",{method:"POST",body:JSON.stringify({reference_id:parentId,reference_type:"inventory_item",photo_url:enumPhoto,photo_role:"lineup",is_ebay_ready:false})});
+      }catch{}}
+
+      const childRows=enumComponents.map((c,idx)=>{
+        const cid=`INV-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,5)}${idx.toString(36)}`;
+        return {
+          id:cid,tracking_mode:"serialized",qty:1,serial_number:"UNKNOWN",
+          equipment_type:c.equipment_type||"Circuit Breaker",
+          manufacturer:c.manufacturer||null,
+          model_number:c.model_or_type||null,catalog_number:c.model_or_type||null,
+          amperage_rating:c.amperage||null,voltage_rating:c.voltage||null,
+          grade:c.grade||"C",location:"main_warehouse",
+          location_detail:`${parentId}${c.position?` Pos ${c.position}`:""}`,
+          status:"pending_decomm",physical_state:"in_parent",
+          parent_id:parentId,position_in_parent:c.position||null,expected_qty:1,
+          date_received:parentRow.date_received,scanned_by:issuedByLabel,
+          condition_notes:c.notes||null,
+        };
+      });
+      if(childRows.length>0)await dbF("inventory_items",{method:"POST",body:JSON.stringify(childRows)});
+
+      const tnResp=await hpgF("rpc/next_decomm_traveler_number",{method:"POST",body:JSON.stringify({})});
+      const travelerNumber=typeof tnResp==="string"?tnResp:(Array.isArray(tnResp)?tnResp[0]:String(tnResp));
+
+      const travelerId=`DT-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,5)}`;
+      const travelerRow={
+        id:travelerId,traveler_number:travelerNumber,
+        parent_inventory_id:parentId,status:"dispatched_to_deman",
+        dispatched_at:new Date().toISOString(),
+        notes:`Issued by ${issuedByLabel} via PowerGate ${mode}`,
+      };
+      await hpgF("decomm_travelers",{method:"POST",body:JSON.stringify(travelerRow)});
+
+      const lineRows=childRows.map((cr,idx)=>({
+        id:`DTL-${Date.now().toString(36).toUpperCase()}${idx.toString(36)}${Math.random().toString(36).slice(2,4)}`,
+        traveler_id:travelerId,child_inventory_id:cr.id,line_number:idx+1,
+        expected_equipment_type:cr.equipment_type,
+        expected_manufacturer:cr.manufacturer,
+        expected_model:cr.model_number,expected_catalog:cr.catalog_number,
+        expected_amperage:cr.amperage_rating,expected_voltage:cr.voltage_rating,
+        expected_position:cr.position_in_parent,
+        extraction_status:"pending",notes:cr.condition_notes,
+      }));
+      if(lineRows.length>0)await hpgF("decomm_traveler_lines",{method:"POST",body:JSON.stringify(lineRows)});
+
+      setQcSession(prev=>[...prev,{...parentRow,_photo:qcItem.photo,_traveler:travelerNumber,_componentCount:childRows.length}]);
+      setEnumLastTraveler({id:travelerId,number:travelerNumber,parentId,parentRow,childRows});
+      setQcItem(null);setEnumComponents([]);setEnumPhoto(null);setEnumParentObs(null);
+      setMsg({t:"success",m:`${travelerNumber} created with ${childRows.length} component${childRows.length===1?"":"s"}`});
+      setQcPhase("enumerate_success");
+    }catch(e){
+      setMsg({t:"error",m:"Save failed: "+e.message});
+      setQcPhase("enumerate_review");
+    }
+  };
+
+  const printTraveler=(t)=>{
+    if(!t){setMsg({t:"error",m:"No traveler to print"});return;}
+    const dt=new Date().toLocaleString();
+    const issuedBy=mode==="receive"?(job.preparedBy||"-"):"Quick Capture";
+    const parent=t.parentRow||{};
+    const parentBits=[parent.id,parent.equipment_type,parent.manufacturer,parent.model_number,parent.bus_rating?parent.bus_rating+"A bus":"",parent.voltage_class].filter(Boolean).join(" . ");
+    const esc=(s)=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+    const rows=(t.childRows||[]).map((c,i)=>`<tr>
+      <td><div class="cbox"></div></td>
+      <td>${esc(c.position_in_parent||i+1)}</td>
+      <td>${esc(c.amperage_rating?c.amperage_rating+"A":"-")}</td>
+      <td>${esc(c.manufacturer||"")} ${esc(c.model_number||"")}</td>
+      <td>${esc(c.equipment_type||"")}</td>
+      <td>${esc(c.voltage_rating||"-")}</td>
+      <td>${esc(c.condition_notes||"")}</td>
+    </tr>`).join("");
+    const html=`<!doctype html><html><head><title>HPG ${esc(t.number)}</title>
+<style>
+@page{size:letter;margin:0.5in}
+body{font-family:-apple-system,Segoe UI,sans-serif;color:#111;font-size:11px}
+h1{font-size:18px;margin:0 0 4px 0}
+.sub{color:#666;margin-bottom:10px;font-size:11px}
+.num{font-size:24px;font-weight:800;letter-spacing:2px;margin:6px 0 14px 0;color:#7c3aed}
+.meta{background:#f5f5f5;padding:10px;border-radius:6px;margin-bottom:14px;font-size:11px;display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
+.parent{background:#fef3c7;padding:10px;border-radius:6px;margin-bottom:14px;font-size:12px;font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:6px}
+th{background:#1e293b;color:#fff;text-align:left;padding:6px 8px;font-size:10px;letter-spacing:0.5px}
+td{padding:8px;border-bottom:1px solid #ccc;font-size:11px;vertical-align:top}
+.cbox{width:18px;height:18px;border:2px solid #000;display:inline-block}
+tr:nth-child(even){background:#fafafa}
+.timing{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:11px}
+.timing div{border-top:1px solid #000;padding-top:4px;margin-top:36px}
+.footer{margin-top:24px;font-size:10px;color:#666}
+</style></head><body>
+<h1>HARDIN POWERGATE</h1>
+<div class="sub">DECOMM TRAVELER . Printed ${esc(dt)}</div>
+<div class="num">${esc(t.number)}</div>
+<div class="meta">
+  <div><strong>Issued:</strong> ${esc(today())}</div>
+  <div><strong>Issued by:</strong> ${esc(issuedBy)}</div>
+  <div><strong>Status:</strong> Dispatched to Deman</div>
+  <div><strong>Components:</strong> ${(t.childRows||[]).length}</div>
+</div>
+<div class="parent"><strong>PARENT ASSEMBLY:</strong> ${esc(parentBits)}</div>
+<table>
+  <thead><tr><th>Pulled</th><th>Pos</th><th>Amp</th><th>Mfr / Model</th><th>Type</th><th>V</th><th>Notes</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="timing">
+  <div>Deman started ___ / ___ / ____  ____:____</div>
+  <div>Deman finished ___ / ___ / ____  ____:____</div>
+</div>
+<div class="footer">Signature: _____________________________________   Date: __________</div>
+<script>window.onload=()=>{setTimeout(()=>window.print(),300)}</script>
+</body></html>`;
+    const w=window.open("","_blank","width=900,height=1200");
+    if(!w){setMsg({t:"error",m:"Popup blocked. Allow popups for this site."});return;}
+    w.document.open();w.document.write(html);w.document.close();
+  };
+
   const printSessionSummary=()=>{
     if(!qcSession.length){setMsg({t:"error",m:"Nothing to print yet"});return;}
     const dt=new Date().toLocaleString();
@@ -552,54 +703,38 @@ export default function Walkthrough() {
     const rows=qcSession.map((r,i)=>{
       const photoCell=r._photo?`<img src="${r._photo}" alt="" style="max-width:120px;max-height:120px;object-fit:cover;border:1px solid #ddd"/>`:"<span style='color:#999'>no photo</span>";
       const idLabel=r.tracking_mode==="quantity"?`Qty ${r.qty}`:`S/N: ${r.serial_number||"UNKNOWN"}`;
-      return `<tr>
-        <td>${i+1}</td>
-        <td>${photoCell}</td>
-        <td><strong>${r.id}</strong><br/><small>${r.equipment_type||""}</small></td>
-        <td>${r.manufacturer||"-"}<br/><small>${r.model_number||r.catalog_number||""}</small></td>
-        <td>${r.amperage_rating?r.amperage_rating+"A":""}${r.voltage_rating?" / "+r.voltage_rating+"V":""}${r.kva_rating?" / "+r.kva_rating+"KVA":""}</td>
-        <td>${r.grade||"C"}</td>
-        <td>${idLabel}</td>
-      </tr>`;
+      const travelerNote=r._traveler?`<br/><span style="display:inline-block;margin-top:3px;padding:1px 6px;background:#ede9fe;color:#7c3aed;font-weight:700;font-size:10px;border-radius:4px">Traveler ${r._traveler} . ${r._componentCount} comp${r._componentCount===1?"":"s"}</span>`:"";
+      return `<tr><td>${i+1}</td><td>${photoCell}</td><td><strong>${r.id}</strong><br/><small>${r.equipment_type||""}</small>${travelerNote}</td><td>${r.manufacturer||"-"}<br/><small>${r.model_number||r.catalog_number||""}</small></td><td>${r.amperage_rating?r.amperage_rating+"A":""}${r.voltage_rating?" / "+r.voltage_rating+"V":""}${r.kva_rating?" / "+r.kva_rating+"KVA":""}</td><td>${r.grade||"C"}</td><td>${idLabel}</td></tr>`;
     }).join("");
     const html=`<!doctype html><html><head><title>HPG ${title} ${dt}</title>
 <style>
-  @page{size:letter;margin:0.5in}
-  body{font-family:-apple-system,Segoe UI,sans-serif;color:#111;font-size:11px}
-  h1{font-size:18px;margin:0 0 4px 0}
-  .sub{color:#666;margin-bottom:12px;font-size:11px}
-  .meta{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;background:#f5f5f5;padding:10px;border-radius:6px;margin-bottom:14px;font-size:11px}
-  table{width:100%;border-collapse:collapse}
-  th{background:#1e293b;color:#fff;text-align:left;padding:6px 8px;font-size:10px;letter-spacing:0.5px}
-  td{padding:6px 8px;border-bottom:1px solid #ddd;vertical-align:top;font-size:11px}
-  td img{display:block}
-  tr:nth-child(even){background:#fafafa}
-  .footer{margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:24px;font-size:11px}
-  .sig{border-top:1px solid #000;padding-top:4px;margin-top:48px}
-  .total{font-size:14px;margin:8px 0;font-weight:700}
+@page{size:letter;margin:0.5in}
+body{font-family:-apple-system,Segoe UI,sans-serif;color:#111;font-size:11px}
+h1{font-size:18px;margin:0 0 4px 0}
+.sub{color:#666;margin-bottom:12px;font-size:11px}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;background:#f5f5f5;padding:10px;border-radius:6px;margin-bottom:14px;font-size:11px}
+table{width:100%;border-collapse:collapse}
+th{background:#1e293b;color:#fff;text-align:left;padding:6px 8px;font-size:10px;letter-spacing:0.5px}
+td{padding:6px 8px;border-bottom:1px solid #ddd;vertical-align:top;font-size:11px}
+td img{display:block}
+tr:nth-child(even){background:#fafafa}
+.footer{margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:24px;font-size:11px}
+.sig{border-top:1px solid #000;padding-top:4px;margin-top:48px}
+.total{font-size:14px;margin:8px 0;font-weight:700}
 </style></head><body>
 <h1>HARDIN POWERGATE</h1>
 <div class="sub">${title} . Printed ${dt}</div>
 ${header}
 <div class="total">${qcSession.length} item${qcSession.length===1?"":"s"}</div>
-<table>
-  <thead><tr><th>#</th><th>Photo</th><th>INV / Type</th><th>Mfr / Model</th><th>Ratings</th><th>Grade</th><th>Track</th></tr></thead>
-  <tbody>${rows}</tbody>
-</table>
-<div class="footer">
-  <div><div class="sig">Receiver signature</div></div>
-  <div><div class="sig">Supervisor signature</div></div>
-</div>
+<table><thead><tr><th>#</th><th>Photo</th><th>INV / Type</th><th>Mfr / Model</th><th>Ratings</th><th>Grade</th><th>Track</th></tr></thead><tbody>${rows}</tbody></table>
+<div class="footer"><div><div class="sig">Receiver signature</div></div><div><div class="sig">Supervisor signature</div></div></div>
 <script>window.onload=()=>{setTimeout(()=>window.print(),300)}</script>
 </body></html>`;
     const w=window.open("","_blank","width=900,height=1200");
     if(!w){setMsg({t:"error",m:"Popup blocked. Allow popups for this site."});return;}
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
+    w.document.open();w.document.write(html);w.document.close();
   };
 
-  /* -- Item management -- */
   const addItem=()=>setItems(p=>[...p,{
     equipmentType:"",manufacturer:"",modelNumber:"",serialNumber:"",
     voltageRating:"",amperageRating:"",quantity:1,grade:"C",
@@ -611,7 +746,6 @@ ${header}
     conditionNotes:"",photos:[],missing:[],breakers:[],
     acquisitionCost:"",refurbCost:"",askingPrice:"",
     barcodeSku:"",putawayLocation:"",putawayQty:1,skidId:"",
-    // Pickup fields
     pickupStatus:"pending",destination:"main_warehouse",
   }]);
   const rmItem=i=>setItems(p=>p.filter((_,j)=>j!==i));
@@ -631,40 +765,28 @@ ${header}
     });
   };
 
-  /* -- Missing component helpers -- */
   const addMissing=(idx)=>setItems(p=>p.map((it,i)=>i===idx?{...it,missing:[...(it.missing||[]),{type:"",desc:"",qty:1}]}:it));
   const rmMissing=(idx,mi)=>setItems(p=>p.map((it,i)=>i===idx?{...it,missing:it.missing.filter((_,j)=>j!==mi)}:it));
   const uMissing=(idx,mi,f,v)=>setItems(p=>p.map((it,i)=>i===idx?{...it,missing:it.missing.map((m,j)=>j===mi?{...m,[f]:v}:m)}:it));
 
-  /* -- Breaker helpers -- */
   const addBreaker=(idx)=>setItems(p=>p.map((it,i)=>i===idx?{...it,breakers:[...(it.breakers||[]),{amp:"20",count:1,poles:"1",grade:"B",oem:"oem",pitting:false,contactWear:false,notes:""}]}:it));
   const rmBreaker=(idx,bi)=>setItems(p=>p.map((it,i)=>i===idx?{...it,breakers:it.breakers.filter((_,j)=>j!==bi)}:it));
   const uBreaker=(idx,bi,f,v)=>setItems(p=>p.map((it,i)=>i===idx?{...it,breakers:it.breakers.map((b,j)=>j===bi?{...b,[f]:v}:b)}:it));
 
-  /* -- eBay comp lookup -- */
   const fetchEbay=async(idx)=>{
     const item=items[idx];
-    // Build smart query based on equipment type and available data
     let q="";
     const cat=item.catalogNumber||"";
     const mfr=item.manufacturer||"";
     const typ=item.equipmentType||"";
     const isXfmr=typ.toLowerCase().includes("transformer");
     const isBkr=typ.toLowerCase().includes("breaker")||typ.toLowerCase().includes("disconnect");
-    
-    if(cat){
-      // Catalog number is the most precise search term
-      q=cat;
-    }else if(isXfmr){
-      q=`${mfr} ${item.kvaRating?item.kvaRating+"KVA":""} transformer ${item.voltageRating||""}`.trim();
-    }else if(isBkr){
-      q=`${mfr} ${item.frameSize?item.frameSize+"A frame":""}${item.amperageRating?item.amperageRating+"A":""} ${item.interruptRating?item.interruptRating+"kAIC":""} circuit breaker`.trim();
-    }else{
-      q=`${mfr} ${typ} ${item.amperageRating?item.amperageRating+"A":""} ${item.voltageRating?item.voltageRating+"V":""}`.trim();
-    }
+    if(cat){q=cat;}
+    else if(isXfmr){q=`${mfr} ${item.kvaRating?item.kvaRating+"KVA":""} transformer ${item.voltageRating||""}`.trim();}
+    else if(isBkr){q=`${mfr} ${item.frameSize?item.frameSize+"A frame":""}${item.amperageRating?item.amperageRating+"A":""} ${item.interruptRating?item.interruptRating+"kAIC":""} circuit breaker`.trim();}
+    else{q=`${mfr} ${typ} ${item.amperageRating?item.amperageRating+"A":""} ${item.voltageRating?item.voltageRating+"V":""}`.trim();}
     q=q.replace(/\s+/g," ").trim();
     if(!q){setMsg({t:"error",m:"Need type/mfr/amps to search"});return;}
-    
     setMsg({t:"info",m:`Searching: "${q}"`});
     try{const r=await fetch(`${SB}/functions/v1/ebay-comps`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q})});
       const d=await r.json();
@@ -675,7 +797,6 @@ ${header}
     }catch(e){setMsg({t:"error",m:"eBay failed: "+e.message});}
   };
 
-  /* -- Calculations -- */
   const laborCost=(parseFloat(job.laborHours)||0)*(parseFloat(job.laborRate)||0);
   const transportCost=parseFloat(job.transportCost)||0;
   const totalCOGS=laborCost+transportCost;
@@ -687,7 +808,6 @@ ${header}
   const targetMargin=parseFloat(job.targetMargin)||45;
   const meetsMargin=marginPct>=targetMargin;
 
-  /* -- WhatsApp message builder -- */
   const buildWhatsAppMsg=(j,its)=>{
     let msg=`*HARDIN POWERGATE ${mode==="walkthrough"?"WALKTHROUGH":"PICKUP"} REPORT*\n`;
     msg+=`Job: ${j.jobName||j.job_name}\nCustomer: ${j.customerName||j.customer_name}\n`;
@@ -716,96 +836,70 @@ ${header}
       }
       msg+=`\n`;
     });
-    msg+=`*SUMMARY:*\n`;
-    msg+=`COGS: $${totalCOGS.toFixed(0)}\n`;
-    msg+=`Revenue: $${totalRevenue.toFixed(0)}\n`;
-    msg+=`Margin: ${marginPct.toFixed(1)}%\n`;
+    msg+=`*SUMMARY:*\nCOGS: $${totalCOGS.toFixed(0)}\nRevenue: $${totalRevenue.toFixed(0)}\nMargin: ${marginPct.toFixed(1)}%\n`;
     return msg;
   };
 
   const sendWhatsApp=(phone)=>{
     const text=buildWhatsAppMsg(job,items);
-    const url=phone
-      ?`https://wa.me/${phone.replace(/\D/g,"")}?text=${encodeURIComponent(text)}`
-      :`https://wa.me/?text=${encodeURIComponent(text)}`;
+    const url=phone?`https://wa.me/${phone.replace(/\D/g,"")}?text=${encodeURIComponent(text)}`:`https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url,"_blank");
   };
 
-  /* -- Validate -- */
   const validate=()=>{
     const e={};
-    if(mode==="receive"){
-      if(!job.preparedBy?.trim())e.preparedBy="Required";
-    }else{
-      if(!job.jobName.trim())e.jobName="Required";
-      if(!job.customerName.trim())e.customerName="Required";
-    }
+    if(mode==="receive"){if(!job.preparedBy?.trim())e.preparedBy="Required";}
+    else{if(!job.jobName.trim())e.jobName="Required";if(!job.customerName.trim())e.customerName="Required";}
     if(items.length===0)e.items="Add at least one item";
     setErrs(e);return Object.keys(e).length===0;
   };
 
-  /* -- Submit: Direct Receive (writes to inventory) -- */
   const handleReceive=async()=>{
     if(!validate())return;
     setSv(true);setMsg(null);
     try{
       for(const it of items){
-        const invId=`INV-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,5)}`;
+        const invId=newInvId();
         const bkrs=it.breakers||[];
         const bkrCount=bkrs.reduce((a,b)=>a+(b.count||0),0);
         const bkrDetail=bkrs.map(b=>`${b.count}x ${b.amp}A ${b.poles}P ${b.grade} ${b.oem}${b.pitting?" PITTING":""}${b.contactWear?" WEAR":""}`).join("; ");
-
         const isBulk=BULK_TYPES.has(it.equipmentType);
         const sn=(it.serialNumber||"").trim();
         const invRow={
-          id:invId,
-          tracking_mode:isBulk?"quantity":"serialized",
+          id:invId,tracking_mode:isBulk?"quantity":"serialized",
           qty:isBulk?(parseInt(it.quantity)||1):1,
           serial_number:isBulk?null:(sn||"UNKNOWN"),
-          model_number:it.modelNumber||null,
-          manufacturer:it.manufacturer||null,equipment_type:it.equipmentType,
+          model_number:it.modelNumber||null,manufacturer:it.manufacturer||null,equipment_type:it.equipmentType,
           voltage_rating:it.voltageRating||null,amperage_rating:it.amperageRating||null,
           grade:it.grade,condition_notes:[it.conditionNotes,bkrDetail?`Breakers: ${bkrDetail}`:""].filter(Boolean).join(" | ")||null,
           location:it.destination||"main_warehouse",
           job_number:job.jobName||null,source_job_site:null,
           customer_origin:job.customerName||null,
-          status:"received",date_received:job.bidDate||today(),scanned_by:job.preparedBy||null,
+          status:it.skidId?"staged_for_ship":"received",
+          date_received:job.bidDate||today(),scanned_by:job.preparedBy||null,
           acquisition_cost:it.acquisitionCost?parseFloat(it.acquisitionCost):null,
           refurb_cost:it.refurbCost?parseFloat(it.refurbCost):null,
           total_cogs:((parseFloat(it.acquisitionCost)||0)+(parseFloat(it.refurbCost)||0))||null,
           asking_price:it.askingPrice?parseFloat(it.askingPrice):null,
-          nema_rating:it.nemaRating||null,
-          indoor_outdoor:it.indoorOutdoor||"indoor",
+          nema_rating:it.nemaRating||null,indoor_outdoor:it.indoorOutdoor||"indoor",
           year_manufactured:it.yearMfg?parseInt(it.yearMfg):null,
-          phase:it.phase||"3",
-          kva_rating:it.kvaRating||null,
-          kva_forced:it.kvaForced||null,
-          winding_material:it.windingMaterial||null,
-          winding_hv:it.windingHv||null,
-          winding_lv:it.windingLv||null,
-          cooling_class:it.coolingClass||null,
-          liquid_type:it.liquidType||null,
+          phase:it.phase||"3",kva_rating:it.kvaRating||null,kva_forced:it.kvaForced||null,
+          winding_material:it.windingMaterial||null,winding_hv:it.windingHv||null,winding_lv:it.windingLv||null,
+          cooling_class:it.coolingClass||null,liquid_type:it.liquidType||null,
           nameplate_weight_lbs:it.nameplateWeight?parseFloat(it.nameplateWeight):null,
           interrupting_rating:it.interruptRating||null,
           frame_size:it.frameSize||null,trip_rating:it.tripRating||null,breaker_type:it.breakerType||null,trip_unit_type:it.tripUnitType||null,mounting_type:it.mountingType||null,catalog_number:it.catalogNumber||null,bus_rating:it.busRating||null,short_circuit_rating:it.shortCircuitRating||null,bil_kv:it.bilKv||null,voltage_class:it.voltageClass||null,num_sections:it.numSections?parseInt(it.numSections):null,bus_material:it.busMaterial||null,switchgear_type:it.switchgearType||null,
-          barcode_sku:it.barcodeSku||null,
-          putaway_location:it.putawayLocation||null,
-          skid_id:it.skidId||null,
-          status:it.skidId?"staged_for_ship":(it.disposition==="scrap"?"received":"received"),
+          barcode_sku:it.barcodeSku||null,putaway_location:it.putawayLocation||null,skid_id:it.skidId||null,
           received_verified:true,verified_by:job.preparedBy||null,verified_date:job.bidDate||today(),
         };
-
         let ok=false;
         if(!loc){try{
           await dbF("inventory_items",{method:"POST",body:JSON.stringify(invRow)});
-          // Link to skid if assigned
-          if(it.skidId){try{await dbF("skid_items",{method:"POST",body:JSON.stringify({skid_id:it.skidId,inventory_id:invId,sort_order:i})});}catch{}}
-          // Subcomponents from breakers
+          if(it.skidId){try{await dbF("skid_items",{method:"POST",body:JSON.stringify({skid_id:it.skidId,inventory_id:invId,sort_order:0})});}catch{}}
           if(bkrs.length>0){
             const subRows=bkrs.map((b,si)=>({inventory_id:invId,component_type:"Breaker",amp_rating:b.amp||null,poles:parseInt(b.poles)||1,quantity:b.count||1,grade:b.grade||"C",condition_notes:[b.pitting?"Pitting":"",b.contactWear?"Contact wear":""].filter(Boolean).join(", ")||null,is_present:true,salvageable:b.grade!=="D",origin_type:b.oem||"oem",sort_order:si}));
             await dbF("inventory_subcomponents",{method:"POST",body:JSON.stringify(subRows)});
           }
-          // Missing components
           const mc=(it.missing||[]).filter(m=>m.type);
           if(mc.length>0){
             const missRows=mc.map(m=>({inventory_id:invId,component_type:m.type,description:m.desc||null,quantity:m.qty||1,replacement_status:"needed"}));
@@ -813,12 +907,7 @@ ${header}
           }
           ok=true;
         }catch{loc=true;}}
-
-        if(!ok){
-          const li={...invRow,missing:it.missing||[],subcomps:bkrs,created_at:new Date().toISOString()};
-          const stored=await sG("wes_inv")||[];
-          await sS("wes_inv",[li,...stored]);
-        }
+        if(!ok){const li={...invRow,missing:it.missing||[],subcomps:bkrs,created_at:new Date().toISOString()};const stored=await sG("wes_inv")||[];await sS("wes_inv",[li,...stored]);}
       }
       setItems([]);setScanImg(null);
       setMsg({t:"success",m:`${items.length} item${items.length>1?"s":""} added to inventory`});
@@ -826,7 +915,6 @@ ${header}
     }catch(e){setMsg({t:"error",m:e.message});}finally{setSv(false);}
   };
 
-  /* -- Submit -- */
   const handleSubmit=async()=>{
     if(!validate())return;setSv(true);setMsg(null);
     const id=`WK-${Date.now().toString(36).toUpperCase()}`;
@@ -836,15 +924,13 @@ ${header}
       const bkrCount=bkrs.reduce((a,b)=>a+(b.count||0),0);
       const bkrDetail=bkrs.map(b=>`${b.count}x ${b.amp}A ${b.poles}P ${b.grade} ${b.oem}${b.pitting?" PITTING":""}${b.contactWear?" WEAR":""}`).join("; ");
       const condNotes=[it.conditionNotes,bkrDetail?`Breakers: ${bkrDetail}`:""].filter(Boolean).join(" | ");
-      return {
-      bid_id:id,equipment_type:it.equipmentType,manufacturer:it.manufacturer||null,model_number:it.modelNumber||null,serial_number:it.serialNumber||null,voltage_rating:it.voltageRating||null,amperage_rating:it.amperageRating||null,quantity:it.quantity,grade:it.grade,disposition:it.disposition,estimated_resale:parseFloat(it.estimatedResale)||null,estimated_scrap:it.estimatedScrap||null,ebay_comp_avg:it.ebayCompAvg||null,price_book_value:it.priceBookValue||null,estimated_weight_lbs:it.nameplateWeight?parseFloat(it.nameplateWeight):(it.estimatedWeight||null),breaker_count:bkrCount||null,breaker_value:null,notes:condNotes||null,sort_order:i,photo_count:(it.photos||[]).length,pickup_status:it.pickupStatus||"pending",destination:it.destination||null,nema_rating:it.nemaRating||null,indoor_outdoor:it.indoorOutdoor||"indoor",year_manufactured:it.yearMfg?parseInt(it.yearMfg):null,phase:it.phase||"3",kva_rating:it.kvaRating||null,kva_forced:it.kvaForced||null,winding_material:it.windingMaterial||null,winding_hv:it.windingHv||null,winding_lv:it.windingLv||null,cooling_class:it.coolingClass||null,liquid_type:it.liquidType||null,nameplate_weight_lbs:it.nameplateWeight?parseFloat(it.nameplateWeight):null,interrupting_rating:it.interruptRating||null,frame_size:it.frameSize||null,trip_rating:it.tripRating||null,breaker_type:it.breakerType||null,trip_unit_type:it.tripUnitType||null,mounting_type:it.mountingType||null,catalog_number:it.catalogNumber||null,bus_rating:it.busRating||null,short_circuit_rating:it.shortCircuitRating||null,bil_kv:it.bilKv||null,voltage_class:it.voltageClass||null,num_sections:it.numSections?parseInt(it.numSections):null,bus_material:it.busMaterial||null,switchgear_type:it.switchgearType||null,
-    };});
+      return {bid_id:id,equipment_type:it.equipmentType,manufacturer:it.manufacturer||null,model_number:it.modelNumber||null,serial_number:it.serialNumber||null,voltage_rating:it.voltageRating||null,amperage_rating:it.amperageRating||null,quantity:it.quantity,grade:it.grade,disposition:it.disposition,estimated_resale:parseFloat(it.estimatedResale)||null,estimated_scrap:it.estimatedScrap||null,ebay_comp_avg:it.ebayCompAvg||null,price_book_value:it.priceBookValue||null,estimated_weight_lbs:it.nameplateWeight?parseFloat(it.nameplateWeight):(it.estimatedWeight||null),breaker_count:bkrCount||null,breaker_value:null,notes:condNotes||null,sort_order:i,photo_count:(it.photos||[]).length,pickup_status:it.pickupStatus||"pending",destination:it.destination||null,nema_rating:it.nemaRating||null,indoor_outdoor:it.indoorOutdoor||"indoor",year_manufactured:it.yearMfg?parseInt(it.yearMfg):null,phase:it.phase||"3",kva_rating:it.kvaRating||null,kva_forced:it.kvaForced||null,winding_material:it.windingMaterial||null,winding_hv:it.windingHv||null,winding_lv:it.windingLv||null,cooling_class:it.coolingClass||null,liquid_type:it.liquidType||null,nameplate_weight_lbs:it.nameplateWeight?parseFloat(it.nameplateWeight):null,interrupting_rating:it.interruptRating||null,frame_size:it.frameSize||null,trip_rating:it.tripRating||null,breaker_type:it.breakerType||null,trip_unit_type:it.tripUnitType||null,mounting_type:it.mountingType||null,catalog_number:it.catalogNumber||null,bus_rating:it.busRating||null,short_circuit_rating:it.shortCircuitRating||null,bil_kv:it.bilKv||null,voltage_class:it.voltageClass||null,num_sections:it.numSections?parseInt(it.numSections):null,bus_material:it.busMaterial||null,switchgear_type:it.switchgearType||null};
+    });
     try{
       let ok=false;
       if(!loc){try{
         await dbF("bids",{method:"POST",body:JSON.stringify(row)});
         if(lineItems.length)await dbF("bid_line_items",{method:"POST",body:JSON.stringify(lineItems)});
-        // Save photos
         for(const it of items){
           if(it.photos&&it.photos.length>0){
             const photoRows=it.photos.map(p=>({reference_id:id,reference_type:"walkthrough_item",photo_url:p,taken_by:job.preparedBy||null}));
@@ -860,22 +946,19 @@ ${header}
     }catch(e){setMsg({t:"error",m:e.message});}finally{setSv(false);}
   };
 
-  /* -- Patch job -- */
   const patchJob=async(id,u)=>{
     const ul=jobs.map(r=>r.id===id?{...r,...u}:r);setJobs(ul);
     if(!loc){try{const d={};for(const[k,v]of Object.entries(u))d[k.replace(/[A-Z]/g,m=>"_"+m.toLowerCase())]=v===""?null:v;await dbF(`bids?id=eq.${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(d)});return;}catch{loc=true;}}
     await sS("wes_wt",ul);
   };
 
-  /* -- Pickup: create inventory record from bid line item -- */
   const pickupItem=async(jobData,lineItem,lineIdx)=>{
     const invId=`INV-${Date.now().toString(36).toUpperCase()}`;
     const eqType=lineItem.equipment_type||lineItem.equipmentType||"";
     const isBulk=BULK_TYPES.has(eqType);
     const sn=(lineItem.serial_number||lineItem.serialNumber||"").trim();
     const invRow={
-      id:invId,
-      tracking_mode:isBulk?"quantity":"serialized",
+      id:invId,tracking_mode:isBulk?"quantity":"serialized",
       qty:isBulk?(parseInt(lineItem.quantity)||1):1,
       serial_number:isBulk?null:(sn||"UNKNOWN"),
       model_number:lineItem.model_number||lineItem.modelNumber||null,
@@ -921,74 +1004,39 @@ ${header}
       bus_material:lineItem.bus_material||lineItem.busMaterial||null,
       switchgear_type:lineItem.switchgear_type||lineItem.switchgearType||null,
     };
-
-    // Parse breaker data from notes for subcomponents
     const breakers=lineItem.breakers||[];
     const missingComps=lineItem.missing||[];
-
     try{
       let ok=false;
       if(!loc){try{
-        // Create inventory item
         await dbF("inventory_items",{method:"POST",body:JSON.stringify(invRow)});
-        // Create subcomponents from breakers
         if(breakers.length>0){
-          const subRows=breakers.map((b,si)=>({
-            inventory_id:invId,
-            component_type:"Breaker",
-            amp_rating:b.amp||null,
-            poles:parseInt(b.poles)||1,
-            quantity:b.count||1,
-            grade:b.grade||"C",
-            condition_notes:[b.pitting?"Pitting":"",b.contactWear?"Contact wear":""].filter(Boolean).join(", ")||null,
-            is_present:true,
-            salvageable:b.grade!=="D",
-            origin_type:b.oem||"oem",
-            sort_order:si,
-          }));
+          const subRows=breakers.map((b,si)=>({inventory_id:invId,component_type:"Breaker",amp_rating:b.amp||null,poles:parseInt(b.poles)||1,quantity:b.count||1,grade:b.grade||"C",condition_notes:[b.pitting?"Pitting":"",b.contactWear?"Contact wear":""].filter(Boolean).join(", ")||null,is_present:true,salvageable:b.grade!=="D",origin_type:b.oem||"oem",sort_order:si}));
           await dbF("inventory_subcomponents",{method:"POST",body:JSON.stringify(subRows)});
         }
-        // Create missing components
         if(missingComps.length>0){
-          const missRows=missingComps.filter(m=>m.type||m.component_type).map(m=>({
-            inventory_id:invId,
-            component_type:m.type||m.component_type,
-            description:m.desc||m.description||null,
-            quantity:m.qty||m.quantity||1,
-            replacement_status:"needed",
-          }));
+          const missRows=missingComps.filter(m=>m.type||m.component_type).map(m=>({inventory_id:invId,component_type:m.type||m.component_type,description:m.desc||m.description||null,quantity:m.qty||m.quantity||1,replacement_status:"needed"}));
           if(missRows.length)await dbF("inventory_missing_components",{method:"POST",body:JSON.stringify(missRows)});
         }
-        // Update bid line item with inventory link and pickup status
-        await dbF(`bid_line_items?bid_id=eq.${encodeURIComponent(jobData.id)}&sort_order=eq.${lineIdx}`,{
-          method:"PATCH",body:JSON.stringify({inventory_id:invId,pickup_status:"completed"}),
-        });
+        await dbF(`bid_line_items?bid_id=eq.${encodeURIComponent(jobData.id)}&sort_order=eq.${lineIdx}`,{method:"PATCH",body:JSON.stringify({inventory_id:invId,pickup_status:"completed"})});
         ok=true;
       }catch(e){loc=true;console.error(e);}}
-
-      // Update local state
       setJobs(prev=>prev.map(j=>{
         if(j.id!==jobData.id)return j;
-        const its=(j.items||j.bid_line_items||[]).map((it,idx)=>
-          idx===lineIdx?{...it,inventory_id:invId,pickup_status:"completed"}:it
-        );
+        const its=(j.items||j.bid_line_items||[]).map((it,idx)=>idx===lineIdx?{...it,inventory_id:invId,pickup_status:"completed"}:it);
         return {...j,items:its,bid_line_items:its};
       }));
       if(!ok)await sS("wes_wt",jobs);
-
       setMsg({t:"success",m:`${invId} created in inventory. ${lineItem.grade==="D"?"Routed to scrap.":"Routed to "+((LOC.find(l=>l.v===(lineItem.destination||"main_warehouse"))?.l)||"warehouse")+"."}`});
     }catch(e){setMsg({t:"error",m:"Pickup failed: "+e.message});}
   };
 
-  /* -- Edit line item after the fact (disposition, destination, grade) -- */
   const patchLineItem=async(jobId,lineIdx,updates)=>{
-    // Update local state
     setJobs(prev=>prev.map(j=>{
       if(j.id!==jobId)return j;
       const its=(j.items||j.bid_line_items||[]).map((it,idx)=>idx===lineIdx?{...it,...updates}:it);
       return {...j,items:its,bid_line_items:its};
     }));
-    // Update Supabase
     if(!loc){
       try{
         const d={};
@@ -999,8 +1047,7 @@ ${header}
     await sS("wes_wt",jobs);
   };
 
-  /* -- Receive verification: confirm arrival + putaway + SKU -- */
-  const [recvModal,setRecvModal]=useState(null); // {jobId, lineIdx, item}
+  const [recvModal,setRecvModal]=useState(null);
   const [recvPutaway,setRecvPutaway]=useState("");
   const [recvSku,setRecvSku]=useState("");
   const [recvBy,setRecvBy]=useState("");
@@ -1016,32 +1063,16 @@ ${header}
     if(!recvModal)return;
     const {jobId,lineIdx,item}=recvModal;
     const invId=item.inventory_id;
-
-    // Patch inventory record with putaway + barcode + verified
     if(invId&&!loc){
       try{
-        await dbF(`inventory_items?id=eq.${encodeURIComponent(invId)}`,{method:"PATCH",body:JSON.stringify({
-          putaway_location:recvPutaway||null,
-          barcode_sku:recvSku||null,
-          received_verified:true,
-          verified_by:recvBy||null,
-          verified_date:today(),
-        })});
+        await dbF(`inventory_items?id=eq.${encodeURIComponent(invId)}`,{method:"PATCH",body:JSON.stringify({putaway_location:recvPutaway||null,barcode_sku:recvSku||null,received_verified:true,verified_by:recvBy||null,verified_date:today()})});
       }catch{loc=true;}
     }
-
-    // Patch bid line item
-    await patchLineItem(jobId,lineIdx,{
-      receive_status:"verified",
-      putaway_location:recvPutaway||null,
-      barcode_sku:recvSku||null,
-    });
-
+    await patchLineItem(jobId,lineIdx,{receive_status:"verified",putaway_location:recvPutaway||null,barcode_sku:recvSku||null});
     setMsg({t:"success",m:`${invId||"Item"} verified. Putaway: ${recvPutaway||"N/A"}`});
     setRecvModal(null);
   };
 
-  /* -- Export -- */
   const esc=v=>{const s=String(v??"");return s.includes(",")||s.includes('"')?`"${s.replace(/"/g,'""')}"`:s;};
   const exportCSV=(b)=>{
     const its=b.items||b.bid_line_items||[];
@@ -1051,10 +1082,8 @@ ${header}
     const bl=new Blob([l.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download=`PowerGate_${b.mode||"walkthrough"}_${b.id||"export"}.csv`;a.click();
   };
 
-  /* ======================================================== */
   return(
     <div style={{fontFamily:'-apple-system,BlinkMacSystemFont,"SF Pro",sans-serif',maxWidth:480,margin:"0 auto",padding:"12px 16px",color:"#3d5e3f",minHeight:"100vh",background:"#f1f5f9"}}>
-      {/* Header */}
       {showSplash&&<SplashScreen onDone={()=>setShowSplash(false)}/>}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,padding:"12px 0",borderBottom:"3px solid #58815a"}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}><LogoMark size={28} /><div><div style={{fontSize:16,fontWeight:800,color:"#565756",letterSpacing:2}}>HARDIN</div><div style={{fontSize:9,color:"#58815a",fontWeight:700,letterSpacing:1.5}}>POWERGATE</div></div></div>
@@ -1063,24 +1092,15 @@ ${header}
         </div>
       </div>
 
-      {/* Mode toggle */}
       {view==="new"&&<div style={{display:"flex",gap:4,marginBottom:12}}>
-        {[
-          {m:"walkthrough",i:"[W]",l:"Walkthrough",s:"On-site bid"},
-          {m:"pickup",i:"[P]",l:"Pickup",s:"Job-site load"},
-          {m:"receive",i:"[R]",l:"Receive",s:"Dock arrival"},
-          {m:"quick",i:"[Q]",l:"Quick",s:"Yard sticker walk"}
-        ].map(({m,i,l,s})=><button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"10px 4px",borderRadius:10,border:`2.5px solid ${mode===m?(m==="quick"?"#0891b2":m==="receive"?"#16a34a":"#3d5e3f"):"#e2e8f0"}`,background:mode===m?(m==="quick"?"#0891b2":m==="receive"?"#16a34a":"#3d5e3f"):"#fff",color:mode===m?"#fff":"#64748b",fontWeight:800,fontSize:12,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-          <div>{i} {l}</div>
-          <div style={{fontSize:9,fontWeight:600,opacity:mode===m?0.9:0.7}}>{s}</div>
+        {[{m:"walkthrough",i:"[W]",l:"Walkthrough",s:"On-site bid"},{m:"pickup",i:"[P]",l:"Pickup",s:"Job-site load"},{m:"receive",i:"[R]",l:"Receive",s:"Dock arrival"},{m:"quick",i:"[Q]",l:"Quick",s:"Yard sticker walk"}].map(({m,i,l,s})=><button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"10px 4px",borderRadius:10,border:`2.5px solid ${mode===m?(m==="quick"?"#0891b2":m==="receive"?"#16a34a":"#3d5e3f"):"#e2e8f0"}`,background:mode===m?(m==="quick"?"#0891b2":m==="receive"?"#16a34a":"#3d5e3f"):"#fff",color:mode===m?"#fff":"#64748b",fontWeight:800,fontSize:12,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+          <div>{i} {l}</div><div style={{fontSize:9,fontWeight:600,opacity:mode===m?0.9:0.7}}>{s}</div>
         </button>)}
       </div>}
 
       {msg&&<div style={{padding:"12px",background:msg.t==="error"?"#fef2f2":msg.t==="info"?"#eff6ff":"#ecfdf5",border:`1px solid ${msg.t==="error"?"#fecaca":msg.t==="info"?"#bfdbfe":"#a7f3d0"}`,borderRadius:10,color:msg.t==="error"?"#dc2626":msg.t==="info"?"#1d4ed8":"#065f46",fontSize:13,marginBottom:12,display:"flex",justifyContent:"space-between"}}><span>{msg.m}</span><button onClick={()=>setMsg(null)} style={{background:"none",border:"none",fontWeight:700,cursor:"pointer",color:"inherit"}}>&times;</button></div>}
 
-      {/* ==== NEW (Walkthrough + Pickup heavy form) ==== */}
       {view==="new"&&(mode==="walkthrough"||mode==="pickup")&&<div>
-        {/* Job Info (walkthrough/pickup only) */}
         {mode!=="receive"&&<div style={card}>
           <div style={{fontSize:15,fontWeight:800,marginBottom:12}}>Job Info</div>
           <div style={{marginBottom:10}}><label style={lbl}>Job / Site Name *</label><input style={errs.jobName?inpE:inp} value={job.jobName} onChange={e=>uf("jobName",e.target.value)} placeholder="Data Center XYZ"/>{errs.jobName&&<div style={{fontSize:12,color:"#ef4444",marginTop:3}}>{errs.jobName}</div>}</div>
@@ -1094,7 +1114,6 @@ ${header}
           </div>
         </div>}
 
-        {/* Costs (walkthrough/pickup only) */}
         {mode!=="receive"&&<div style={card}>
           <div style={{fontSize:15,fontWeight:800,marginBottom:12}}>Acquisition Costs</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
@@ -1109,20 +1128,6 @@ ${header}
           </div>
         </div>}
 
-        {/* Receive mode: source + location */}
-        {mode==="receive"&&<div style={card}>
-          <div style={{fontSize:15,fontWeight:800,marginBottom:12}}>Receiving Info</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-            <div><label style={lbl}>Received By *</label><input style={errs.preparedBy?inpE:inp} value={job.preparedBy} onChange={e=>uf("preparedBy",e.target.value)} placeholder="Your name"/>{errs.preparedBy&&<div style={{fontSize:12,color:"#ef4444",marginTop:3}}>{errs.preparedBy}</div>}</div>
-            <div><label style={lbl}>Date</label><input style={inp} type="date" value={job.bidDate} onChange={e=>uf("bidDate",e.target.value)}/></div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <div><label style={lbl}>Source / Purchased From</label><input style={inp} value={job.customerName} onChange={e=>uf("customerName",e.target.value)} placeholder="Vendor, walk-in, auction..."/></div>
-            <div><label style={lbl}>Reference / PO #</label><input style={inp} value={job.jobName} onChange={e=>uf("jobName",e.target.value)} placeholder="PO, lot #, ref"/></div>
-          </div>
-        </div>}
-
-        {/* Equipment Items */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
           <span style={{fontSize:15,fontWeight:800}}>Equipment ({items.length})</span>
           <button onClick={addItem} style={{padding:"10px 16px",borderRadius:8,border:"none",background:"#2563eb",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>+ Add Item</button>
@@ -1138,15 +1143,12 @@ ${header}
                   {it.grade&&<span style={{padding:"2px 8px",borderRadius:6,background:(gc[it.grade]||"#6b7280")+"18",color:gc[it.grade],fontSize:10,fontWeight:800}}>{it.grade}</span>}
                   {it.disposition&&it.disposition!=="unassigned"&&<span style={{padding:"2px 6px",borderRadius:6,background:(dc[it.disposition]||"#6b7280")+"15",color:dc[it.disposition],fontSize:9,fontWeight:700}}>{it.disposition}</span>}
                 </div>
-                {!expandedItems[i]&&<div style={{fontSize:11,color:"#64748b",marginTop:2}}>
-                  {it.equipmentType||"No type"}{it.manufacturer?` . ${it.manufacturer}`:""}{it.kvaRating?` . ${it.kvaRating}KVA`:""}{it.amperageRating?` . ${it.amperageRating}A`:""}{it.voltageRating?` . ${it.voltageRating}V`:""}{it.serialNumber?` . S/N:${it.serialNumber}`:(it.quantity||1)>1?` . Qty:${it.quantity}`:""}{parseFloat(it.estimatedResale)>0?` . $${parseFloat(it.estimatedResale).toFixed(0)}`:""}{(it.photos||[]).length>0?` . [CAM] ${(it.photos||[]).length}`:""}
-                </div>}
+                {!expandedItems[i]&&<div style={{fontSize:11,color:"#64748b",marginTop:2}}>{it.equipmentType||"No type"}{it.manufacturer?` . ${it.manufacturer}`:""}{it.kvaRating?` . ${it.kvaRating}KVA`:""}{it.amperageRating?` . ${it.amperageRating}A`:""}{it.voltageRating?` . ${it.voltageRating}V`:""}{it.serialNumber?` . S/N:${it.serialNumber}`:(it.quantity||1)>1?` . Qty:${it.quantity}`:""}{parseFloat(it.estimatedResale)>0?` . $${parseFloat(it.estimatedResale).toFixed(0)}`:""}{(it.photos||[]).length>0?` . [CAM] ${(it.photos||[]).length}`:""}</div>}
               </div>
               <button onClick={e=>{e.stopPropagation();rmItem(i);}} style={{background:"none",border:"none",color:"#ef4444",fontSize:20,cursor:"pointer"}}>&times;</button>
             </div>
 
             {expandedItems[i]&&<>
-            {/* OCR + Photo row */}
             <div style={{display:"flex",gap:6,marginBottom:10}}>
               <label style={{flex:1,padding:10,borderRadius:8,background:scanning?"#94a3b8":"#3d5e3f",color:"#fff",fontWeight:700,fontSize:12,textAlign:"center",cursor:"pointer"}}>
                 {scanning?"...":"[CAM]  Scan Nameplate"}
@@ -1157,19 +1159,14 @@ ${header}
                 <input type="file" accept="image/*" capture="environment" onChange={e=>addPhoto(e.target.files?.[0],i)} style={{display:"none"}}/>
               </label>
             </div>
-            {/* Barcode / QR Scanner */}
             <div style={{display:"flex",gap:6,marginBottom:8}}>
-              <button onClick={()=>setCatalogScanIdx(i)} style={{flex:1,padding:8,borderRadius:8,border:"1.5px solid #d97706",background:"#fff7ed",color:"#92400e",fontWeight:700,fontSize:11,cursor:"pointer",textAlign:"center"}}>
-                Barcode / QR
-              </button>
+              <button onClick={()=>setCatalogScanIdx(i)} style={{flex:1,padding:8,borderRadius:8,border:"1.5px solid #d97706",background:"#fff7ed",color:"#92400e",fontWeight:700,fontSize:11,cursor:"pointer",textAlign:"center"}}>Barcode / QR</button>
             </div>
 
-            {/* Photo thumbnails */}
             {it.photos&&it.photos.length>0&&<div style={{display:"flex",gap:6,marginBottom:10,overflowX:"auto",paddingBottom:4}}>
               {it.photos.map((p,pi)=><img key={pi} src={p} alt="" style={{width:60,height:60,borderRadius:8,objectFit:"cover",border:"2px solid #e5e7eb",flexShrink:0}}/>)}
             </div>}
 
-            {/* Equipment fields */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Type</label><select style={inpSm} value={it.equipmentType} onChange={e=>uItem(i,"equipmentType",e.target.value)}><option value="">Select</option>{EQ.map(t=><option key={t}>{t}</option>)}</select></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Mfr</label><select style={inpSm} value={it.manufacturer} onChange={e=>uItem(i,"manufacturer",e.target.value)}><option value="">Select</option>{MFR.map(m=><option key={m}>{m}</option>)}</select></div>
@@ -1181,23 +1178,21 @@ ${header}
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Volts</label><input style={inpSm} value={it.voltageRating} onChange={e=>uItem(i,"voltageRating",e.target.value)}/></div>
             </div>
 
-            {/* Quantity — shown when no serial number (bulk/lot items) */}
             {!it.serialNumber&&<div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#eff6ff",borderRadius:8,marginBottom:8,border:"1px solid #bfdbfe"}}>
-              <span style={{fontSize:11,fontWeight:700,color:"#1d4ed8",flex:1}}>No S/N — Qty</span>
+              <span style={{fontSize:11,fontWeight:700,color:"#1d4ed8",flex:1}}>No S/N . Qty</span>
               <button onClick={()=>uItem(i,"quantity",Math.max(1,(it.quantity||1)-1))} style={{width:32,height:32,borderRadius:6,border:"1.5px solid #bfdbfe",background:"#fff",fontWeight:800,fontSize:18,cursor:"pointer",lineHeight:1,color:"#1d4ed8"}}>-</button>
               <input type="number" min="1" value={it.quantity||1} onChange={e=>uItem(i,"quantity",parseInt(e.target.value)||1)} style={{width:56,textAlign:"center",padding:"6px 0",border:"2px solid #2563eb",borderRadius:8,fontSize:18,fontWeight:800,color:"#1d4ed8",background:"#fff"}}/>
               <button onClick={()=>uItem(i,"quantity",(it.quantity||1)+1)} style={{width:32,height:32,borderRadius:6,border:"1.5px solid #bfdbfe",background:"#fff",fontWeight:800,fontSize:18,cursor:"pointer",lineHeight:1,color:"#1d4ed8"}}>+</button>
               <span style={{fontSize:10,color:"#6b7280"}}>units</span>
             </div>}
 
-            {/* Specs row 2 */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>NEMA</label><select style={inpSm} value={it.nemaRating||""} onChange={e=>uItem(i,"nemaRating",e.target.value)}><option value="">--</option>{NEMA.map(n=><option key={n.v} value={n.v}>{n.v}</option>)}</select></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Phase</label><div style={{display:"flex",gap:3}}>{PHASE.map(p=><button key={p} onClick={()=>uItem(i,"phase",p)} style={{flex:1,padding:"8px 0",borderRadius:6,border:`2px solid ${it.phase===p?"#2563eb":"#e2e8f0"}`,background:it.phase===p?"#2563eb15":"#fff",color:it.phase===p?"#2563eb":"#cbd5e1",fontWeight:800,fontSize:12,cursor:"pointer"}}>{p}P</button>)}</div></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Year</label><input style={inpSm} type="number" value={it.yearMfg||""} onChange={e=>uItem(i,"yearMfg",e.target.value)} placeholder="2001"/></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>In/Out</label><div style={{display:"flex",gap:3}}>{[{v:"indoor",l:"In"},{v:"outdoor",l:"Out"}].map(o=><button key={o.v} onClick={()=>uItem(i,"indoorOutdoor",o.v)} style={{flex:1,padding:"8px 0",borderRadius:6,border:`2px solid ${it.indoorOutdoor===o.v?"#2563eb":"#e2e8f0"}`,background:it.indoorOutdoor===o.v?"#2563eb15":"#fff",color:it.indoorOutdoor===o.v?"#2563eb":"#cbd5e1",fontWeight:700,fontSize:11,cursor:"pointer"}}>{o.l}</button>)}</div></div>
             </div>
-            {/* Transformer / Breaker / Switchgear details */}
+
             <Section title="Transformer Details" badge={it.kvaRating?`${it.kvaRating}KVA`:""} color="#7c3aed" defaultOpen={it.equipmentType?.toLowerCase().includes("transformer")}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>KVA</label><input style={inpSm} value={it.kvaRating||""} onChange={e=>uItem(i,"kvaRating",e.target.value)} placeholder="Cont."/></div>
@@ -1212,6 +1207,7 @@ ${header}
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>kAIC</label><input style={inpSm} value={it.interruptRating||""} onChange={e=>uItem(i,"interruptRating",e.target.value)} placeholder="N/A"/></div>
             </div>
             </Section>
+
             <Section title="Breaker Details" badge={it.frameSize?`${it.frameSize}A frame`:(it.interruptRating?`${it.interruptRating}kAIC`:"")} color="#0369a1" defaultOpen={it.equipmentType?.toLowerCase().includes("breaker")||it.equipmentType?.toLowerCase().includes("disconnect")}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Frame</label><input style={inpSm} value={it.frameSize||""} onChange={e=>uItem(i,"frameSize",e.target.value)} placeholder="800A"/></div>
@@ -1224,6 +1220,7 @@ ${header}
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Trip Unit</label><select style={inpSm} value={it.tripUnitType||""} onChange={e=>uItem(i,"tripUnitType",e.target.value)}><option value="">--</option><option value="thermal_magnetic">Thermal-Magnetic</option><option value="electronic">Electronic</option><option value="LSI">LSI</option><option value="LSIG">LSIG</option><option value="MicroLogic">MicroLogic</option><option value="Digitrip">Digitrip</option></select></div>
             </div>
             </Section>
+
             <Section title="Switchgear Details" badge={it.busRating?`${it.busRating}A bus`:""} color="#059669" defaultOpen={it.equipmentType?.toLowerCase().includes("switchgear")||it.equipmentType?.toLowerCase().includes("mcc")}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Bus Amps</label><input style={inpSm} value={it.busRating||""} onChange={e=>uItem(i,"busRating",e.target.value)} placeholder="2000"/></div>
@@ -1236,64 +1233,42 @@ ${header}
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Bus Metal</label><select style={inpSm} value={it.busMaterial||""} onChange={e=>uItem(i,"busMaterial",e.target.value)}><option value="">--</option><option value="CU">Copper</option><option value="AL">Aluminum</option></select></div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Type</label><select style={inpSm} value={it.switchgearType||""} onChange={e=>uItem(i,"switchgearType",e.target.value)}><option value="">--</option><option value="metal-clad">Metal-Clad</option><option value="metal-enclosed">Metal-Enclosed</option><option value="dead-front">Dead-Front</option><option value="arc-resistant">Arc-Resistant</option></select></div>
             </div>
-
             </Section>
 
-            {/* Grade */}
             <div style={{display:"flex",gap:4,marginBottom:8}}>
               {GRD.map(g=><button key={g.v} onClick={()=>uItem(i,"grade",g.v)} style={{flex:1,padding:"10px 0",borderRadius:8,border:`2.5px solid ${it.grade===g.v?g.c:"#e2e8f0"}`,background:it.grade===g.v?g.c+"15":"#fff",color:it.grade===g.v?g.c:"#cbd5e1",fontWeight:800,fontSize:14,cursor:"pointer"}}>{g.v}<div style={{fontSize:9,fontWeight:600}}>{g.d}</div></button>)}
             </div>
 
-            {/* Disposition */}
             <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}>
               {DISP.map(d=><button key={d.v} onClick={()=>uItem(i,"disposition",d.v)} style={{padding:"8px 10px",borderRadius:8,border:`1.5px solid ${it.disposition===d.v?d.c:"#e2e8f0"}`,background:it.disposition===d.v?d.c+"15":"#fff",color:it.disposition===d.v?d.c:"#94a3b8",fontWeight:700,fontSize:11,cursor:"pointer"}}>{d.l}</button>)}
             </div>
 
-            {/* Skid assignment - shows when disposition is skid */}
             {it.disposition==="skid"&&<div style={{background:"#f0fdfa",borderRadius:10,padding:12,marginBottom:8,border:"1px solid #99f6e4"}}>
               <div style={{fontSize:11,fontWeight:700,color:"#0891b2",marginBottom:6}}>Skid Assignment</div>
               <div style={{display:"flex",gap:6,alignItems:"end"}}>
-                <div style={{flex:1}}>
-                  <select style={inpSm} value={it.skidId||""} onChange={e=>uItem(i,"skidId",e.target.value)}>
-                    <option value="">Select skid...</option>
-                    {skids.map(s=><option key={s.id} value={s.id}>{s.skid_number}{s.customer_name?` - ${s.customer_name}`:""}</option>)}
-                  </select>
-                </div>
+                <div style={{flex:1}}><select style={inpSm} value={it.skidId||""} onChange={e=>uItem(i,"skidId",e.target.value)}><option value="">Select skid...</option>{skids.map(s=><option key={s.id} value={s.id}>{s.skid_number}{s.customer_name?` - ${s.customer_name}`:""}</option>)}</select></div>
                 <button onClick={async()=>{const name=newSkidName||undefined;const id=await createSkid(name);if(id){uItem(i,"skidId",id);setNewSkidName("");}}} style={{padding:"10px 14px",borderRadius:8,border:"none",background:"#0891b2",color:"#fff",fontWeight:700,fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>+ New</button>
               </div>
               {it.skidId&&<div style={{fontSize:10,color:"#0891b2",marginTop:4,fontWeight:600}}>Assigned to: {skids.find(s=>s.id===it.skidId)?.skid_number||it.skidId}</div>}
-              {!it.skidId&&<div style={{marginTop:6}}>
-                <input style={{...inpSm,fontSize:12}} value={newSkidName} onChange={e=>setNewSkidName(e.target.value)} placeholder="New skid name (e.g. SKID-004 or Customer-PO)"/>
-              </div>}
+              {!it.skidId&&<div style={{marginTop:6}}><input style={{...inpSm,fontSize:12}} value={newSkidName} onChange={e=>setNewSkidName(e.target.value)} placeholder="New skid name"/></div>}
             </div>}
 
-            {/* Pickup destination (in pickup mode) */}
             {mode==="pickup"&&<div style={{marginBottom:8}}>
               <label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Destination</label>
               <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
                 {LOC.map(l=><button key={l.v} onClick={()=>uItem(i,"destination",l.v)} style={{padding:"6px 10px",borderRadius:6,border:`1.5px solid ${it.destination===l.v?"#2563eb":"#e2e8f0"}`,background:it.destination===l.v?"#2563eb15":"#fff",color:it.destination===l.v?"#2563eb":"#94a3b8",fontWeight:600,fontSize:10,cursor:"pointer"}}>{l.l}</button>)}
               </div>
               <ScanInput label="Putaway Location (scan bin/rack barcode)" value={it.putawayLocation} onChange={v=>uItem(i,"putawayLocation",v)} placeholder="e.g. LOC-A1-01"/>
-              {(it.quantity||1)>1&&<div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#f0fdf4",borderRadius:8,marginTop:8,border:"1px solid #bbf7d0"}}>
-                <span style={{fontSize:11,fontWeight:700,color:"#15803d",flex:1}}>Putaway Qty</span>
-                <button onClick={()=>uItem(i,"putawayQty",Math.max(1,(it.putawayQty||it.quantity||1)-1))} style={{width:30,height:30,borderRadius:6,border:"1.5px solid #bbf7d0",background:"#fff",fontWeight:800,fontSize:16,cursor:"pointer",color:"#15803d"}}>-</button>
-                <input type="number" min="1" max={it.quantity||1} value={it.putawayQty||it.quantity||1} onChange={e=>uItem(i,"putawayQty",Math.min(it.quantity||1,parseInt(e.target.value)||1))} style={{width:52,textAlign:"center",padding:"4px 0",border:"2px solid #16a34a",borderRadius:6,fontSize:16,fontWeight:800,color:"#15803d"}}/>
-                <button onClick={()=>uItem(i,"putawayQty",Math.min(it.quantity||1,(it.putawayQty||it.quantity||1)+1))} style={{width:30,height:30,borderRadius:6,border:"1.5px solid #bbf7d0",background:"#fff",fontWeight:800,fontSize:16,cursor:"pointer",color:"#15803d"}}>+</button>
-                <span style={{fontSize:10,color:"#6b7280"}}>of {it.quantity}</span>
-              </div>}
             </div>}
 
-            {/* Pricing */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Resale $</label><input style={{...inpSm,borderColor:parseFloat(it.estimatedResale)>0?"#16a34a":"#d1d5db"}} type="number" step="0.01" value={it.estimatedResale} onChange={e=>uItem(i,"estimatedResale",e.target.value)}/>{it.priceBookValue>0&&<div style={{fontSize:9,color:"#2563eb"}}>Book: ${it.priceBookValue.toFixed(0)}</div>}</div>
               <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Scrap $</label><div style={{...inpSm,background:"#f8fafc",color:"#475569"}}>${(it.estimatedScrap||0).toFixed(0)}</div><div style={{fontSize:9,color:"#94a3b8"}}>{it.estimatedWeight>0?`~${it.estimatedWeight} lbs`:""}</div></div>
               <div><button onClick={()=>fetchEbay(i)} style={{width:"100%",padding:"10px 0",borderRadius:8,border:"1px solid #16a34a",background:"#fff",color:"#16a34a",fontWeight:700,fontSize:11,cursor:"pointer",marginTop:18}}>eBay{it.ebayCompAvg>0?` $${it.ebayCompAvg.toFixed(0)}`:""}</button></div>
             </div>
 
-
-            {/* Full Market Comps Panel */}
             <CompPanel item={{equipmentType:it.equipmentType,manufacturer:it.manufacturer,modelNumber:it.modelNumber,catalogNumber:it.catalogNumber,amperageRating:it.amperageRating,kvaRating:it.kvaRating,voltageRating:it.voltageRating,grade:it.grade}} />
-            {/* Breaker Inventory */}
+
             <Section title="BREAKERS" badge={`${(it.breakers||[]).reduce((a,b)=>a+(b.count||0),0)} total`} color="#0369a1">
             <div style={{background:"#f0f9ff",borderRadius:10,padding:12,marginBottom:0,border:"1px solid #bae6fd"}}>
               <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
@@ -1306,33 +1281,27 @@ ${header}
                     <span style={{fontSize:10,fontWeight:700,color:"#475569"}}>#{bi+1}</span>
                     <button onClick={()=>rmBreaker(i,bi)} style={{background:"none",border:"none",color:"#ef4444",fontSize:16,cursor:"pointer",padding:0}}>&times;</button>
                   </div>
-                  {/* Row 1: Amp, Count, Poles */}
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:6}}>
                     <div><label style={{fontSize:9,fontWeight:600,color:"#6b7280"}}>Amps</label><select style={{...inpSm,padding:"8px"}} value={br.amp} onChange={e=>uBreaker(i,bi,"amp",e.target.value)}>{AMPS.map(a=><option key={a}>{a}</option>)}</select></div>
                     <div><label style={{fontSize:9,fontWeight:600,color:"#6b7280"}}>Count</label><input style={{...inpSm,padding:"8px",textAlign:"center"}} type="number" min={1} value={br.count} onChange={e=>uBreaker(i,bi,"count",parseInt(e.target.value)||1)}/></div>
                     <div><label style={{fontSize:9,fontWeight:600,color:"#6b7280"}}>Poles</label><div style={{display:"flex",gap:3}}>{["1","2","3"].map(p=><button key={p} onClick={()=>uBreaker(i,bi,"poles",p)} style={{flex:1,padding:"8px 0",borderRadius:6,border:`2px solid ${br.poles===p?"#2563eb":"#e2e8f0"}`,background:br.poles===p?"#2563eb15":"#fff",color:br.poles===p?"#2563eb":"#cbd5e1",fontWeight:800,fontSize:12,cursor:"pointer"}}>{p}P</button>)}</div></div>
                   </div>
-                  {/* Row 2: Grade */}
                   <div style={{display:"flex",gap:3,marginBottom:6}}>
                     {GRD.map(g=><button key={g.v} onClick={()=>uBreaker(i,bi,"grade",g.v)} style={{flex:1,padding:"8px 0",borderRadius:6,border:`2px solid ${br.grade===g.v?g.c:"#e2e8f0"}`,background:br.grade===g.v?g.c+"15":"#fff",color:br.grade===g.v?g.c:"#cbd5e1",fontWeight:800,fontSize:12,cursor:"pointer"}}>{g.v}</button>)}
                   </div>
-                  {/* Row 3: OEM/AM + Condition flags */}
                   <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                     <button onClick={()=>uBreaker(i,bi,"oem",br.oem==="oem"?"aftermarket":"oem")} style={{padding:"7px 10px",borderRadius:6,border:`1.5px solid ${br.oem==="oem"?"#0369a1":"#c026d3"}`,background:br.oem==="oem"?"#0369a115":"#c026d315",color:br.oem==="oem"?"#0369a1":"#c026d3",fontWeight:700,fontSize:10,cursor:"pointer"}}>{br.oem==="oem"?"OEM":"Aftermarket"}</button>
-                    <button onClick={()=>uBreaker(i,bi,"pitting",!br.pitting)} style={{padding:"7px 10px",borderRadius:6,border:`1.5px solid ${br.pitting?"#dc2626":"#d1d5db"}`,background:br.pitting?"#dc262615":"#fff",color:br.pitting?"#dc2626":"#94a3b8",fontWeight:700,fontSize:10,cursor:"pointer"}}>{br.pitting?"\u26a0 Pitting":"No Pitting"}</button>
-                    <button onClick={()=>uBreaker(i,bi,"contactWear",!br.contactWear)} style={{padding:"7px 10px",borderRadius:6,border:`1.5px solid ${br.contactWear?"#f59e0b":"#d1d5db"}`,background:br.contactWear?"#f59e0b15":"#fff",color:br.contactWear?"#f59e0b":"#94a3b8",fontWeight:700,fontSize:10,cursor:"pointer"}}>{br.contactWear?"\u26a0 Contact Wear":"Good Contact"}</button>
+                    <button onClick={()=>uBreaker(i,bi,"pitting",!br.pitting)} style={{padding:"7px 10px",borderRadius:6,border:`1.5px solid ${br.pitting?"#dc2626":"#d1d5db"}`,background:br.pitting?"#dc262615":"#fff",color:br.pitting?"#dc2626":"#94a3b8",fontWeight:700,fontSize:10,cursor:"pointer"}}>{br.pitting?"Pitting":"No Pitting"}</button>
+                    <button onClick={()=>uBreaker(i,bi,"contactWear",!br.contactWear)} style={{padding:"7px 10px",borderRadius:6,border:`1.5px solid ${br.contactWear?"#f59e0b":"#d1d5db"}`,background:br.contactWear?"#f59e0b15":"#fff",color:br.contactWear?"#f59e0b":"#94a3b8",fontWeight:700,fontSize:10,cursor:"pointer"}}>{br.contactWear?"Contact Wear":"Good Contact"}</button>
                   </div>
                 </div>
               ))}
             </div>
             </Section>
 
-            {/* Missing */}
             <Section title="Missing Components" badge={`${(it.missing||[]).length}`} color="#dc2626">
             <div style={{marginBottom:0}}>
-              <div style={{display:"flex",justifyContent:"flex-end",marginBottom:4}}>
-                <button onClick={()=>addMissing(i)} style={{padding:"4px 10px",borderRadius:6,border:"none",background:"#dc2626",color:"#fff",fontWeight:700,fontSize:10,cursor:"pointer"}}>+</button>
-              </div>
+              <div style={{display:"flex",justifyContent:"flex-end",marginBottom:4}}><button onClick={()=>addMissing(i)} style={{padding:"4px 10px",borderRadius:6,border:"none",background:"#dc2626",color:"#fff",fontWeight:700,fontSize:10,cursor:"pointer"}}>+</button></div>
               {(it.missing||[]).map((m,mi)=>(
                 <div key={mi} style={{display:"flex",gap:6,marginBottom:4}}>
                   <select style={{...inpSm,flex:1,padding:"6px"}} value={m.type} onChange={e=>uMissing(i,mi,"type",e.target.value)}><option value="">Type</option>{MT.map(t=><option key={t}>{t}</option>)}</select>
@@ -1343,75 +1312,31 @@ ${header}
             </div>
             </Section>
 
-            {/* Condition notes */}
             <input style={inpSm} value={it.conditionNotes} onChange={e=>uItem(i,"conditionNotes",e.target.value)} placeholder="Condition: rust, dents, mods, weather exposure..."/>
-
-            {/* Receive mode: COGS + Location per item */}
-            {mode==="receive"&&<div style={{marginTop:8}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
-                <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Cost $</label><input style={inpSm} type="number" step="0.01" value={it.acquisitionCost||""} onChange={e=>uItem(i,"acquisitionCost",e.target.value)} placeholder="What you paid"/></div>
-                <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Refurb $</label><input style={inpSm} type="number" step="0.01" value={it.refurbCost||""} onChange={e=>uItem(i,"refurbCost",e.target.value)} placeholder="Est refurb"/></div>
-                <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Ask $</label><input style={inpSm} type="number" step="0.01" value={it.askingPrice||""} onChange={e=>uItem(i,"askingPrice",e.target.value)} placeholder="Sell price"/></div>
-              </div>
-              {(parseFloat(it.acquisitionCost)||0)+(parseFloat(it.refurbCost)||0)>0&&<div style={{fontSize:11,fontWeight:700,marginBottom:8,color:parseFloat(it.askingPrice)>((parseFloat(it.acquisitionCost)||0)+(parseFloat(it.refurbCost)||0))?"#16a34a":"#94a3b8"}}>COGS: ${((parseFloat(it.acquisitionCost)||0)+(parseFloat(it.refurbCost)||0)).toFixed(2)}{it.askingPrice?` | Margin: ${(((parseFloat(it.askingPrice)-((parseFloat(it.acquisitionCost)||0)+(parseFloat(it.refurbCost)||0)))/parseFloat(it.askingPrice))*100).toFixed(0)}%`:""}</div>}
-              <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Location</label>
-              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                {LOC.filter(l=>l.v!=="scrap_yard").map(l=><button key={l.v} onClick={()=>uItem(i,"destination",l.v)} style={{padding:"6px 10px",borderRadius:6,border:`1.5px solid ${(it.destination||"main_warehouse")===l.v?"#2563eb":"#e2e8f0"}`,background:(it.destination||"main_warehouse")===l.v?"#2563eb15":"#fff",color:(it.destination||"main_warehouse")===l.v?"#2563eb":"#94a3b8",fontWeight:600,fontSize:10,cursor:"pointer"}}>{l.l}</button>)}
-              </div></div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:8}}>
-                <ScanInput label="Putaway Location" value={it.putawayLocation} onChange={v=>uItem(i,"putawayLocation",v)} placeholder="Scan bin/rack..."/>
-                <ScanInput label="SKU / Barcode" value={it.barcodeSku} onChange={v=>uItem(i,"barcodeSku",v)} placeholder="Scan or assign..."/>
-              </div>
-              {(it.quantity||1)>1&&<div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#f0fdf4",borderRadius:8,marginTop:8,border:"1px solid #bbf7d0"}}>
-                <span style={{fontSize:11,fontWeight:700,color:"#15803d",flex:1}}>Putaway Qty</span>
-                <button onClick={()=>uItem(i,"putawayQty",Math.max(1,(it.putawayQty||it.quantity||1)-1))} style={{width:30,height:30,borderRadius:6,border:"1.5px solid #bbf7d0",background:"#fff",fontWeight:800,fontSize:16,cursor:"pointer",color:"#15803d"}}>-</button>
-                <input type="number" min="1" max={it.quantity||1} value={it.putawayQty||it.quantity||1} onChange={e=>uItem(i,"putawayQty",Math.min(it.quantity||1,parseInt(e.target.value)||1))} style={{width:52,textAlign:"center",padding:"4px 0",border:"2px solid #16a34a",borderRadius:6,fontSize:16,fontWeight:800,color:"#15803d"}}/>
-                <button onClick={()=>uItem(i,"putawayQty",Math.min(it.quantity||1,(it.putawayQty||it.quantity||1)+1))} style={{width:30,height:30,borderRadius:6,border:"1.5px solid #bbf7d0",background:"#fff",fontWeight:800,fontSize:16,cursor:"pointer",color:"#15803d"}}>+</button>
-                <span style={{fontSize:10,color:"#6b7280"}}>of {it.quantity}</span>
-              </div>}
-            </div>}
             </>}
           </div>
         ))}
 
-        {/* Catalog barcode scanner modal */}
-        {catalogScanIdx!==null&&<BarcodeScanner
-          label="Scan Catalog / Model Barcode"
-          onScan={v=>{
-            setItems(prev=>prev.map((it,j)=>j===catalogScanIdx?{...it,catalogNumber:v,modelNumber:v}:it));
-            setMsg({t:"success",m:"Scanned: "+v});
-            setCatalogScanIdx(null);
-          }}
-          onClose={()=>setCatalogScanIdx(null)}
-        />}
+        {catalogScanIdx!==null&&<BarcodeScanner label="Scan Catalog / Model Barcode" onScan={v=>{setItems(prev=>prev.map((it,j)=>j===catalogScanIdx?{...it,catalogNumber:v,modelNumber:v}:it));setMsg({t:"success",m:"Scanned: "+v});setCatalogScanIdx(null);}} onClose={()=>setCatalogScanIdx(null)}/>}
 
-        {/* Summary (walkthrough/pickup only) */}
         {mode!=="receive"&&items.length>0&&<div style={{...card,background:meetsMargin?"#ecfdf5":"#fef2f2",border:`2px solid ${meetsMargin?"#a7f3d0":"#fecaca"}`}}>
-          <div style={{fontSize:15,fontWeight:800,marginBottom:10,color:meetsMargin?"#065f46":"#991b1b"}}>{meetsMargin?"\u2713 Bid Summary":"\u26a0 Below "+targetMargin+"% Margin"}</div>
+          <div style={{fontSize:15,fontWeight:800,marginBottom:10,color:meetsMargin?"#065f46":"#991b1b"}}>{meetsMargin?"Bid Summary":"Below "+targetMargin+"% Margin"}</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
             <div><div style={{fontSize:10,color:"#6b7280"}}>COGS</div><div style={{fontSize:15,fontWeight:800}}>${totalCOGS.toFixed(0)}</div></div>
             <div><div style={{fontSize:10,color:"#6b7280"}}>Revenue</div><div style={{fontSize:15,fontWeight:800,color:"#16a34a"}}>${totalRevenue.toFixed(0)}</div></div>
             <div><div style={{fontSize:10,color:"#6b7280"}}>Profit</div><div style={{fontSize:15,fontWeight:800,color:grossProfit>0?"#16a34a":"#dc2626"}}>${grossProfit.toFixed(0)}</div></div>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-            <div><div style={{fontSize:10,color:"#6b7280"}}>Resale</div><div style={{fontWeight:700}}>${totalResale.toFixed(0)}</div></div>
-            <div><div style={{fontSize:10,color:"#6b7280"}}>Scrap</div><div style={{fontWeight:700}}>${totalScrap.toFixed(0)}</div></div>
-          </div>
         </div>}
 
-        {/* Actions */}
         <div style={{display:"flex",gap:8,marginBottom:8}}>
-          <button onClick={mode==="receive"?handleReceive:handleSubmit} disabled={sv} style={{flex:2,padding:16,borderRadius:12,border:"none",background:sv?"#94a3b8":mode==="receive"?"linear-gradient(135deg,#16a34a,#15803d)":"linear-gradient(135deg,#3d5e3f,#1e293b)",color:"#fff",fontSize:16,fontWeight:800,cursor:sv?"not-allowed":"pointer"}}>{sv?"Saving...":mode==="receive"?`Add ${items.length} to Inventory`:"Save"}</button>
+          <button onClick={handleSubmit} disabled={sv} style={{flex:2,padding:16,borderRadius:12,border:"none",background:sv?"#94a3b8":"linear-gradient(135deg,#3d5e3f,#1e293b)",color:"#fff",fontSize:16,fontWeight:800,cursor:sv?"not-allowed":"pointer"}}>{sv?"Saving...":"Save"}</button>
           <button onClick={()=>sendWhatsApp()} style={{flex:1,padding:16,borderRadius:12,border:"none",background:"#25D366",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>WhatsApp</button>
         </div>
 
-        {/* Notes */}
         <div style={card}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:60,resize:"vertical"}} value={job.notes} onChange={e=>uf("notes",e.target.value)} placeholder="Scope, exclusions, access notes..."/></div>
       </div>}
 
-      {/* ==== QUICK CAPTURE + SIMPLIFIED RECEIVE (shared capture flow) ==== */}
       {view==="new"&&(mode==="quick"||mode==="receive")&&<div>
-        {/* Sticky session header (visible once we've left the source/location phase) */}
         {qcPhase!=="location"&&<div style={{position:"sticky",top:0,zIndex:10,background:mode==="receive"?"#16a34a":"#0891b2",color:"#fff",padding:"10px 14px",borderRadius:10,marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div style={{fontSize:13,fontWeight:700}}>
             {mode==="quick"?<>
@@ -1425,44 +1350,28 @@ ${header}
           <button onClick={()=>setQcPhase("location")} style={{padding:"6px 12px",borderRadius:6,border:"1px solid rgba(255,255,255,0.4)",background:"transparent",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>{mode==="receive"?"Edit info":"Change"}</button>
         </div>}
 
-        {/* PHASE: LOCATION (Quick mode) — sticker code */}
         {qcPhase==="location"&&mode==="quick"&&<div style={card}>
           <div style={{fontSize:18,fontWeight:800,marginBottom:6}}>Where are you walking?</div>
           <div style={{fontSize:12,color:"#6b7280",marginBottom:16}}>Read the sticker code on the shelf. Type it exactly. Stays set until you change it.</div>
           <div style={{marginBottom:16}}>
             <label style={lbl}>Location code</label>
             <input style={{...inp,fontSize:20,padding:"16px 14px",letterSpacing:1}} value={qcLocationCode} onChange={e=>setQcLocationCode(e.target.value)} placeholder="e.g. 1-2-3-5 or FN" autoFocus/>
-            <div style={{fontSize:11,color:"#6b7280",marginTop:6}}>Saved verbatim. Items get re-located when stock moves from Botham Jean to Hansboro.</div>
           </div>
-          <button onClick={()=>{
-            if(!qcLocationCode.trim()){setMsg({t:"error",m:"Location code required"});return;}
-            setMsg(null);setQcPhase("capture");
-          }} style={{width:"100%",padding:18,borderRadius:12,border:"none",background:"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>Start Capturing &rarr;</button>
+          <button onClick={()=>{if(!qcLocationCode.trim()){setMsg({t:"error",m:"Location code required"});return;}setMsg(null);setQcPhase("capture");}} style={{width:"100%",padding:18,borderRadius:12,border:"none",background:"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>Start Capturing &rarr;</button>
         </div>}
 
-        {/* PHASE: SOURCE (Receive mode) — receiving info */}
         {qcPhase==="location"&&mode==="receive"&&<div style={card}>
           <div style={{fontSize:18,fontWeight:800,marginBottom:6}}>Receiving items</div>
           <div style={{fontSize:12,color:"#6b7280",marginBottom:16}}>Net-new sellable stock arriving at the dock. Fill once, then capture all items in this load.</div>
-          <div style={{marginBottom:10}}>
-            <label style={lbl}>Received By *</label>
-            <input style={inp} value={job.preparedBy} onChange={e=>uf("preparedBy",e.target.value)} placeholder="Your name" autoFocus/>
-          </div>
+          <div style={{marginBottom:10}}><label style={lbl}>Received By *</label><input style={inp} value={job.preparedBy} onChange={e=>uf("preparedBy",e.target.value)} placeholder="Your name" autoFocus/></div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
             <div><label style={lbl}>Source / Vendor</label><input style={inp} value={job.customerName} onChange={e=>uf("customerName",e.target.value)} placeholder="Customer, vendor, auction"/></div>
             <div><label style={lbl}>PO / Reference</label><input style={inp} value={job.jobName} onChange={e=>uf("jobName",e.target.value)} placeholder="PO #, lot, job ref"/></div>
           </div>
-          <div style={{marginBottom:16}}>
-            <label style={lbl}>Date</label>
-            <input style={inp} type="date" value={job.bidDate} onChange={e=>uf("bidDate",e.target.value)}/>
-          </div>
-          <button onClick={()=>{
-            if(!job.preparedBy.trim()){setMsg({t:"error",m:"Received By required"});return;}
-            setMsg(null);setQcPhase("capture");
-          }} style={{width:"100%",padding:18,borderRadius:12,border:"none",background:"linear-gradient(135deg,#16a34a,#15803d)",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>Start Receiving &rarr;</button>
+          <div style={{marginBottom:16}}><label style={lbl}>Date</label><input style={inp} type="date" value={job.bidDate} onChange={e=>uf("bidDate",e.target.value)}/></div>
+          <button onClick={()=>{if(!job.preparedBy.trim()){setMsg({t:"error",m:"Received By required"});return;}setMsg(null);setQcPhase("capture");}} style={{width:"100%",padding:18,borderRadius:12,border:"none",background:"linear-gradient(135deg,#16a34a,#15803d)",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>Start Receiving &rarr;</button>
         </div>}
 
-        {/* PHASE: CAPTURE (camera trigger) */}
         {qcPhase==="capture"&&<div>
           <div style={card}>
             <div style={{textAlign:"center",padding:"20px 0"}}>
@@ -1478,7 +1387,6 @@ ${header}
           <button onClick={()=>{setQcPhase("location");setQcSession([]);setView("inventory");loadInventory();}} style={{width:"100%",boxSizing:"border-box",padding:14,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#475569",fontSize:14,fontWeight:700,cursor:"pointer"}}>Finish session . View inventory</button>
         </div>}
 
-        {/* PHASE: ANALYZING */}
         {qcPhase==="analyzing"&&<div style={card}>
           <div style={{textAlign:"center",padding:"40px 0"}}>
             <div style={{fontSize:36,marginBottom:12}}>...</div>
@@ -1487,9 +1395,7 @@ ${header}
           </div>
         </div>}
 
-        {/* PHASE: REVIEW */}
         {qcPhase==="review"&&qcItem&&<div>
-          {/* Photo + AI summary */}
           <div style={card}>
             {qcItem.photo&&<img src={qcItem.photo} alt="captured" style={{width:"100%",maxHeight:200,objectFit:"cover",borderRadius:10,marginBottom:12}}/>}
             <div style={{fontSize:11,fontWeight:700,color:"#0891b2",marginBottom:6,letterSpacing:1}}>AI EXTRACTED . CONFIRM OR EDIT</div>
@@ -1497,7 +1403,7 @@ ${header}
               <label style={lbl}>Type *</label>
               <select style={qcItem.equipmentType?inp:inpE} value={qcItem.equipmentType} onChange={e=>setQcItem(i=>({...i,equipmentType:e.target.value}))}>
                 <option value="">-- pick --</option>
-                {EQ.map(t=><option key={t} value={t}>{t}{BULK_TYPES.has(t)?" (bulk)":""}</option>)}
+                {EQ.map(t=><option key={t} value={t}>{t}{BULK_TYPES.has(t)?" (bulk)":""}{ENUM_PARENT_TYPES.has(t)?" (enumerable)":""}</option>)}
               </select>
             </div>
             <div style={{marginBottom:10}}>
@@ -1519,7 +1425,6 @@ ${header}
             </div>
           </div>
 
-          {/* Grade picker */}
           <div style={card}>
             <label style={lbl}>Grade *</label>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6}}>
@@ -1527,7 +1432,6 @@ ${header}
             </div>
           </div>
 
-          {/* Track as bulk override */}
           <div style={card}>
             <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
               <input type="checkbox" checked={qcItem.bulkOverride!==null?qcItem.bulkOverride:BULK_TYPES.has(qcItem.equipmentType)} onChange={e=>setQcItem(i=>({...i,bulkOverride:e.target.checked}))} style={{width:22,height:22,accentColor:mode==="receive"?"#16a34a":"#0891b2",cursor:"pointer"}}/>
@@ -1538,7 +1442,6 @@ ${header}
             </label>
           </div>
 
-          {/* Qty (bulk) or S/N (serialized) */}
           <div style={card}>
             {(qcItem.bulkOverride!==null?qcItem.bulkOverride:BULK_TYPES.has(qcItem.equipmentType))?<>
               <label style={lbl}>Quantity *</label>
@@ -1555,317 +1458,210 @@ ${header}
             </>}
           </div>
 
-          {/* Actions */}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <button onClick={()=>handleQuickReceive("next")} style={{padding:18,borderRadius:12,border:"none",background:mode==="receive"?"linear-gradient(135deg,#16a34a,#15803d)":"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>Receive &amp; Capture Next &rarr;</button>
-            <button onClick={()=>handleQuickReceive("finish")} style={{padding:14,borderRadius:10,border:`2px solid ${mode==="receive"?"#16a34a":"#0891b2"}`,background:"#fff",color:mode==="receive"?"#16a34a":"#0891b2",fontSize:14,fontWeight:700,cursor:"pointer"}}>Receive &amp; Finish Session</button>
+            {ENUM_PARENT_TYPES.has(qcItem.equipmentType)&&<button onClick={startEnumerate} style={{padding:18,borderRadius:12,border:"none",background:"linear-gradient(135deg,#7c3aed,#5b21b6)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>Enumerate components &amp; issue traveler &rarr;</button>}
+            <button onClick={()=>handleQuickReceive("next")} style={{padding:18,borderRadius:12,border:"none",background:mode==="receive"?"linear-gradient(135deg,#16a34a,#15803d)":"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>{ENUM_PARENT_TYPES.has(qcItem.equipmentType)?"Receive parent only &amp; Capture Next \u2192":"Receive &amp; Capture Next \u2192"}</button>
+            <button onClick={()=>handleQuickReceive("finish")} style={{padding:14,borderRadius:10,border:`2px solid ${mode==="receive"?"#16a34a":"#0891b2"}`,background:"#fff",color:mode==="receive"?"#16a34a":"#0891b2",fontSize:14,fontWeight:700,cursor:"pointer"}}>{ENUM_PARENT_TYPES.has(qcItem.equipmentType)?"Receive parent only &amp; Finish Session":"Receive &amp; Finish Session"}</button>
             <button onClick={()=>{setQcItem(null);setQcPhase("capture");}} style={{padding:12,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontSize:13,fontWeight:600,cursor:"pointer"}}>Retake / Discard</button>
           </div>
         </div>}
 
-        {/* PHASE: SAVING */}
         {qcPhase==="saving"&&<div style={card}>
           <div style={{textAlign:"center",padding:"40px 0"}}>
             <div style={{fontSize:36,marginBottom:12}}>...</div>
             <div style={{fontSize:16,fontWeight:700,color:mode==="receive"?"#16a34a":"#0891b2"}}>Saving to inventory...</div>
           </div>
         </div>}
+
+        {qcPhase==="enumerate_capture"&&<div style={card}>
+          <div style={{textAlign:"center",padding:"20px 0"}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#7c3aed",marginBottom:8,letterSpacing:1}}>STEP 2 OF 2 . COMPONENT LINEUP</div>
+            <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>Photograph the open front face</div>
+            <div style={{fontSize:12,color:"#6b7280",marginBottom:20,padding:"0 8px"}}>Capture all visible breakers/buckets in one shot. AI will enumerate each component into a traveler list.</div>
+            <label style={{display:"block",boxSizing:"border-box",width:"100%",padding:"18px 16px",borderRadius:14,background:"linear-gradient(135deg,#7c3aed,#5b21b6)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",textAlign:"center"}}>
+              <input ref={enumFileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];e.target.value="";if(f)handleEnumerateCapture(f);}}/>
+              CAPTURE LINEUP
+            </label>
+            <button onClick={()=>setQcPhase("review")} style={{marginTop:12,padding:"10px 18px",borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontSize:13,fontWeight:600,cursor:"pointer"}}>Back</button>
+          </div>
+        </div>}
+
+        {qcPhase==="enumerate_analyzing"&&<div style={card}>
+          <div style={{textAlign:"center",padding:"40px 0"}}>
+            <div style={{fontSize:36,marginBottom:12}}>...</div>
+            <div style={{fontSize:16,fontWeight:700,color:"#7c3aed"}}>AI enumerating components...</div>
+            <div style={{fontSize:12,color:"#6b7280",marginTop:6}}>Identifying position, type, mfr, model, amperage for each unit</div>
+          </div>
+        </div>}
+
+        {qcPhase==="enumerate_review"&&<div>
+          <div style={card}>
+            <div style={{fontSize:11,fontWeight:700,color:"#7c3aed",marginBottom:8,letterSpacing:1}}>REVIEW &amp; EDIT COMPONENTS</div>
+            {enumPhoto&&<img src={enumPhoto} alt="lineup" style={{width:"100%",maxHeight:180,objectFit:"cover",borderRadius:10,marginBottom:12}}/>}
+            {enumParentObs&&<div style={{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:8,padding:10,marginBottom:12,fontSize:11,color:"#78350f"}}>
+              <strong>Parent observations:</strong> {[enumParentObs.bus_rating?`Bus ${enumParentObs.bus_rating}A`:"",enumParentObs.voltage_class?enumParentObs.voltage_class:"",enumParentObs.visible_sections?`${enumParentObs.visible_sections} sections`:"",enumParentObs.condition_notes||""].filter(Boolean).join(" . ")||"(none)"}
+            </div>}
+            <div style={{fontSize:13,fontWeight:700,marginBottom:8,color:"#1e293b"}}>{enumComponents.length} component{enumComponents.length===1?"":"s"} detected</div>
+          </div>
+
+          {enumComponents.length===0&&<div style={{...card,textAlign:"center",color:"#94a3b8",fontSize:13}}>No components found. Add manually or recapture.</div>}
+
+          {enumComponents.map((c,ci)=>(
+            <div key={ci} style={{...card,borderLeft:"4px solid #7c3aed",padding:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <span style={{fontSize:12,fontWeight:800,color:"#7c3aed"}}>POS {c.position||ci+1}</span>
+                <button onClick={()=>rmEnumComponent(ci)} style={{background:"none",border:"none",color:"#ef4444",fontSize:18,cursor:"pointer"}}>&times;</button>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}}>
+                <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Position</label><input style={inpSm} value={c.position} onChange={e=>uEnumComponent(ci,"position",e.target.value)} placeholder="1A, 2B..."/></div>
+                <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Type</label><select style={inpSm} value={c.equipment_type} onChange={e=>uEnumComponent(ci,"equipment_type",e.target.value)}><option value="Circuit Breaker">Circuit Breaker</option><option value="Motor Starter">Motor Starter</option><option value="VFD / Drive">VFD / Drive</option><option value="Disconnect Switch">Disconnect Switch</option><option value="Relay">Relay</option><option value="Trip Unit">Trip Unit</option><option value="Other">Other</option></select></div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}}>
+                <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Mfr</label><input style={inpSm} value={c.manufacturer} onChange={e=>uEnumComponent(ci,"manufacturer",e.target.value)} placeholder="Cutler-Hammer..."/></div>
+                <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Model / Cat</label><input style={inpSm} value={c.model_or_type} onChange={e=>uEnumComponent(ci,"model_or_type",e.target.value)} placeholder="FD3030L..."/></div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:6}}>
+                <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Amps</label><input style={inpSm} value={c.amperage} onChange={e=>uEnumComponent(ci,"amperage",e.target.value)} placeholder="30"/></div>
+                <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Poles</label><input style={inpSm} value={c.poles} onChange={e=>uEnumComponent(ci,"poles",e.target.value)} placeholder="3"/></div>
+                <div><label style={{fontSize:10,fontWeight:600,color:"#6b7280"}}>Volts</label><input style={inpSm} value={c.voltage} onChange={e=>uEnumComponent(ci,"voltage",e.target.value)} placeholder="480"/></div>
+              </div>
+              <input style={inpSm} value={c.notes} onChange={e=>uEnumComponent(ci,"notes",e.target.value)} placeholder="Notes (damage, missing handle, etc.)"/>
+            </div>
+          ))}
+
+          <button onClick={addEnumComponent} style={{width:"100%",boxSizing:"border-box",padding:12,borderRadius:10,border:"2px dashed #7c3aed",background:"#faf5ff",color:"#7c3aed",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:12}}>+ Add Component Manually</button>
+
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <button onClick={handleEnumerateSave} disabled={enumComponents.length===0} style={{padding:18,borderRadius:12,border:"none",background:enumComponents.length===0?"#94a3b8":"linear-gradient(135deg,#7c3aed,#5b21b6)",color:"#fff",fontSize:16,fontWeight:800,cursor:enumComponents.length===0?"not-allowed":"pointer"}}>Save &amp; Issue Traveler</button>
+            <button onClick={()=>setQcPhase("enumerate_capture")} style={{padding:12,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontSize:13,fontWeight:600,cursor:"pointer"}}>Recapture Lineup</button>
+            <button onClick={()=>{setEnumComponents([]);setEnumPhoto(null);setEnumParentObs(null);setQcPhase("review");}} style={{padding:12,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel . Back to parent review</button>
+          </div>
+        </div>}
+
+        {qcPhase==="enumerate_saving"&&<div style={card}>
+          <div style={{textAlign:"center",padding:"40px 0"}}>
+            <div style={{fontSize:36,marginBottom:12}}>...</div>
+            <div style={{fontSize:16,fontWeight:700,color:"#7c3aed"}}>Issuing traveler...</div>
+            <div style={{fontSize:12,color:"#6b7280",marginTop:6}}>Creating parent, child records, traveler header and lines</div>
+          </div>
+        </div>}
+
+        {qcPhase==="enumerate_success"&&enumLastTraveler&&<div>
+          <div style={card}>
+            <div style={{textAlign:"center",padding:"24px 0"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#7c3aed",marginBottom:6,letterSpacing:1}}>TRAVELER CREATED</div>
+              <div style={{fontSize:28,fontWeight:800,color:"#7c3aed",letterSpacing:2,marginBottom:8}}>{enumLastTraveler.number}</div>
+              <div style={{fontSize:13,color:"#6b7280"}}>{enumLastTraveler.childRows.length} component{enumLastTraveler.childRows.length===1?"":"s"} . dispatched to deman</div>
+            </div>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <button onClick={()=>printTraveler(enumLastTraveler)} style={{padding:18,borderRadius:12,border:"none",background:"linear-gradient(135deg,#7c3aed,#5b21b6)",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>Print Traveler</button>
+            <button onClick={()=>{setEnumLastTraveler(null);setQcPhase("capture");setTimeout(()=>qcFileRef.current?.click(),100);}} style={{padding:14,borderRadius:10,border:`2px solid ${mode==="receive"?"#16a34a":"#0891b2"}`,background:"#fff",color:mode==="receive"?"#16a34a":"#0891b2",fontSize:14,fontWeight:700,cursor:"pointer"}}>Continue Capturing &rarr;</button>
+            <button onClick={()=>{setEnumLastTraveler(null);setQcPhase("location");setQcSession([]);setView("inventory");loadInventory();}} style={{padding:12,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontSize:13,fontWeight:600,cursor:"pointer"}}>Finish Session . View Inventory</button>
+          </div>
+        </div>}
       </div>}
 
-      {/* ==== JOB LIST ==== */}
       {view==="jobs"&&<div>
-        <div style={{display:"flex",gap:6,marginBottom:14}}>
-          <button onClick={loadJobs} style={{flex:1,padding:10,borderRadius:8,border:"1px solid #d1d5db",background:"#fff",color:"#475569",fontWeight:700,fontSize:13,cursor:"pointer"}}>{ld?"...":"Refresh"}</button>
-        </div>
-        {jobs.length===0?<div style={{textAlign:"center",padding:48,color:"#9ca3af"}}>No jobs yet. Tap + to start a walkthrough.</div>:jobs.map(b=>{
-          const isE=expId===b.id;const its=b.items||b.bid_line_items||[];
-          const mgn=parseFloat(b.gross_margin_pct)||0;const mC=mgn>=45?"#16a34a":mgn>=30?"#f59e0b":"#dc2626";
-          return(
-            <div key={b.id} style={{...card,borderLeft:`4px solid ${mC}`,padding:14,cursor:"pointer"}} onClick={()=>setExpId(isE?null:b.id)}>
-              <div style={{display:"flex",justifyContent:"space-between"}}>
-                <div>
-                  <div style={{display:"flex",gap:6,alignItems:"center"}}><span style={{fontWeight:800,fontSize:14}}>{b.id}</span><span style={{fontSize:10,padding:"2px 6px",borderRadius:6,background:b.mode==="pickup"?"#0891b218":"#8b5cf618",color:b.mode==="pickup"?"#0891b2":"#8b5cf6",fontWeight:700}}>{b.mode||"walkthrough"}</span><span style={{fontSize:10,padding:"2px 6px",borderRadius:6,background:b.status==="accepted"?"#16a34a18":b.status==="rejected"?"#dc262618":"#6b728018",color:b.status==="accepted"?"#16a34a":b.status==="rejected"?"#dc2626":"#6b7280",fontWeight:700}}>{b.status}</span></div>
-                  <div style={{fontSize:13,fontWeight:600,marginTop:2}}>{b.job_name}</div>
-                  <div style={{fontSize:12,color:"#6b7280"}}>{b.customer_name} | {b.bid_date}</div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:16,fontWeight:800}}>${parseFloat(b.total_revenue||0).toFixed(0)}</div>
-                  <div style={{fontSize:12,fontWeight:700,color:mC}}>{mgn.toFixed(0)}%</div>
-                  <div style={{fontSize:10,color:"#94a3b8"}}>{its.length} items</div>
-                </div>
+        {ld?<div style={{textAlign:"center",padding:40,color:"#94a3b8"}}>Loading...</div>:
+        jobs.length===0?<div style={{...card,textAlign:"center",color:"#94a3b8",padding:40}}>No jobs yet. Tap + to start.</div>:
+        jobs.map(j=>(
+          <div key={j.id} style={card}>
+            <div onClick={()=>setExpId(expId===j.id?null:j.id)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:800,color:"#1e293b"}}>{j.job_name||j.jobName}</div>
+                <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{j.customer_name||j.customerName} . {j.bid_date||j.bidDate} . {(j.items||j.bid_line_items||[]).length} items . {j.mode||"walkthrough"}</div>
               </div>
-
-              {isE&&<div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #e5e7eb"}}>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10,fontSize:12}}>
-                  <div><div style={{color:"#6b7280"}}>COGS</div><div style={{fontWeight:800}}>${parseFloat(b.total_cogs||0).toFixed(0)}</div></div>
-                  <div><div style={{color:"#6b7280"}}>Revenue</div><div style={{fontWeight:800,color:"#16a34a"}}>${parseFloat(b.total_revenue||0).toFixed(0)}</div></div>
-                  <div><div style={{color:"#6b7280"}}>Profit</div><div style={{fontWeight:800,color:mC}}>${(parseFloat(b.total_revenue||0)-parseFloat(b.total_cogs||0)).toFixed(0)}</div></div>
-                </div>
-                {its.map((it,j)=>{
-                  const pickedUp=it.pickup_status==="completed"||it.pickupStatus==="completed";
-                  return(
-                  <div key={j} style={{padding:"10px 0",borderBottom:"1px solid #f1f5f9",fontSize:12}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                      <div><span style={{fontWeight:600}}>{it.equipment_type}</span>{it.manufacturer&&<span style={{color:"#94a3b8",marginLeft:4}}>{it.manufacturer}</span>}{it.amperage_rating&&<span style={{marginLeft:4}}>{it.amperage_rating}A</span>}{it.kva_rating&&<span style={{marginLeft:4,color:"#475569"}}>{it.kva_rating}KVA</span>}<span style={{marginLeft:4,padding:"1px 5px",borderRadius:4,background:(gc[it.grade]||"#6b7280")+"18",color:gc[it.grade],fontSize:10,fontWeight:700}}>{it.grade}</span>{it.nema_rating&&<span style={{marginLeft:4,padding:"1px 5px",borderRadius:4,background:"#6366f118",color:"#6366f1",fontSize:9,fontWeight:600}}>NEMA {it.nema_rating}</span>}{it.winding_material&&<span style={{marginLeft:4,padding:"1px 5px",borderRadius:4,background:it.winding_material==="CU"?"#f59e0b18":"#6b728018",color:it.winding_material==="CU"?"#f59e0b":"#6b7280",fontSize:9,fontWeight:600}}>{it.winding_material}</span>}{it.breaker_count>0&&<span style={{marginLeft:4,padding:"1px 5px",borderRadius:4,background:"#0369a118",color:"#0369a1",fontSize:10,fontWeight:600}}>{it.breaker_count} bkrs</span>}</div>
-                      <span style={{fontWeight:700,whiteSpace:"nowrap"}}>${parseFloat(it.disposition==="scrap"?it.estimated_scrap:it.estimated_resale||0).toFixed(0)}</span>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:14,fontWeight:800,color:"#16a34a"}}>${parseFloat(j.total_revenue||0).toFixed(0)}</div>
+                <div style={{fontSize:10,color:parseFloat(j.gross_margin_pct||0)>=(j.target_margin_pct||45)?"#16a34a":"#dc2626",fontWeight:700}}>{parseFloat(j.gross_margin_pct||0).toFixed(0)}%</div>
+              </div>
+            </div>
+            {expId===j.id&&<div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #e5e7eb"}}>
+              {(j.items||j.bid_line_items||[]).map((it,ii)=>(
+                <div key={ii} style={{padding:8,marginBottom:6,background:"#f8fafc",borderRadius:8,borderLeft:`3px solid ${gc[it.grade]||"#6b7280"}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontSize:12,fontWeight:700}}>{it.equipment_type||it.equipmentType} . {it.manufacturer||"?"}</div>
+                    <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                      <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:(gc[it.grade]||"#6b7280")+"18",color:gc[it.grade],fontWeight:700}}>{it.grade}</span>
+                      {it.pickup_status==="completed"&&<span style={{fontSize:9,padding:"2px 5px",borderRadius:4,background:"#dcfce7",color:"#15803d",fontWeight:700}}>PICKED UP</span>}
+                      {it.receive_status==="verified"&&<span style={{fontSize:9,padding:"2px 5px",borderRadius:4,background:"#dbeafe",color:"#1d4ed8",fontWeight:700}}>VERIFIED</span>}
                     </div>
-                    {/* Editable disposition */}
-                    {!pickedUp&&<div style={{display:"flex",gap:3,marginTop:6,flexWrap:"wrap"}}>
-                      {DISP.map(d=><button key={d.v} onClick={e=>{e.stopPropagation();patchLineItem(b.id,j,{disposition:d.v});}} style={{padding:"5px 8px",borderRadius:6,border:`1.5px solid ${(it.disposition||"unassigned")===d.v?d.c:"#e2e8f0"}`,background:(it.disposition||"unassigned")===d.v?d.c+"15":"#fff",color:(it.disposition||"unassigned")===d.v?d.c:"#cbd5e1",fontWeight:700,fontSize:9,cursor:"pointer"}}>{d.l}</button>)}
-                    </div>}
-                    {/* Editable destination */}
-                    {!pickedUp&&(it.disposition&&it.disposition!=="unassigned")&&<div style={{display:"flex",gap:3,marginTop:4,flexWrap:"wrap"}}>
-                      {LOC.map(l=><button key={l.v} onClick={e=>{e.stopPropagation();patchLineItem(b.id,j,{destination:l.v});}} style={{padding:"4px 7px",borderRadius:5,border:`1px solid ${(it.destination||"main_warehouse")===l.v?"#2563eb":"#e2e8f0"}`,background:(it.destination||"main_warehouse")===l.v?"#2563eb12":"#fff",color:(it.destination||"main_warehouse")===l.v?"#2563eb":"#cbd5e1",fontWeight:600,fontSize:8,cursor:"pointer"}}>{l.l}</button>)}
-                    </div>}
-                    {/* Current assignment display */}
-                    {(it.disposition&&it.disposition!=="unassigned")&&<div style={{marginTop:4,fontSize:10,color:dc[it.disposition]||"#6b7280",fontWeight:600}}>{it.disposition}{it.destination?` \u2192 ${LOC.find(l=>l.v===it.destination)?.l||it.destination}`:""}</div>}
-                    {/* Pickup + Receive controls per item */}
-                    {(b.status==="accepted"||b.mode==="pickup")&&(
-                      <div style={{marginTop:6}}>
-                        {pickedUp?(
-                          <div>
-                            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-                              <span style={{color:"#16a34a",fontWeight:700,fontSize:11}}>{"\u2713"} Picked up</span>
-                              {(it.inventory_id)&&<span style={{fontSize:10,color:"#6b7280"}}>{it.inventory_id}</span>}
-                            </div>
-                            {/* Receive verification */}
-                            {(it.receive_status==="verified"||it.receiveStatus==="verified")?(
-                              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                                <span style={{color:"#8b5cf6",fontWeight:700,fontSize:11}}>{"\u2713"} Received</span>
-                                {(it.putaway_location||it.putawayLocation)&&<span style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:"#8b5cf618",color:"#8b5cf6",fontWeight:600}}>{it.putaway_location||it.putawayLocation}</span>}
-                                {(it.barcode_sku||it.barcodeSku)&&<span style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:"#f59e0b18",color:"#f59e0b",fontWeight:600}}>SKU: {it.barcode_sku||it.barcodeSku}</span>}
-                              </div>
-                            ):(
-                              <button onClick={e=>{e.stopPropagation();openReceiveModal(b.id,j,it);}}
-                                style={{width:"100%",padding:10,borderRadius:8,border:"none",background:"linear-gradient(135deg,#8b5cf6,#7c3aed)",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer"}}>
-                                {"[R]"} Verify Receipt + Putaway
-                              </button>
-                            )}
-                          </div>
-                        ):(
-                          <button onClick={e=>{e.stopPropagation();pickupItem(b,it,j);}}
-                            style={{width:"100%",padding:10,borderRadius:8,border:"none",background:it.grade==="D"?"linear-gradient(135deg,#dc2626,#b91c1c)":"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer"}}>
-                            {it.grade==="D"?"\uD83D\uDE9A Pick Up \u2192 Scrap Yard":`\uD83D\uDE9A Pick Up \u2192 ${LOC.find(l=>l.v===(it.destination||"main_warehouse"))?.l||"Warehouse"}`}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>);
-                })}
-                {/* Job action buttons */}
-                <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
-                  <button onClick={e=>{e.stopPropagation();exportCSV(b);}} style={{flex:1,padding:10,borderRadius:8,border:"1px solid #16a34a",background:"#fff",color:"#16a34a",fontWeight:700,fontSize:12,cursor:"pointer",minWidth:60}}>CSV</button>
-                  <button onClick={e=>{e.stopPropagation();const msg=buildWhatsAppMsg(b,its);window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,"_blank");}} style={{flex:1,padding:10,borderRadius:8,border:"none",background:"#25D366",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",minWidth:60}}>WhatsApp</button>
-                  {b.status==="draft"&&<button onClick={e=>{e.stopPropagation();patchJob(b.id,{status:"sent"});}} style={{flex:1,padding:10,borderRadius:8,border:"none",background:"#2563eb",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",minWidth:60}}>Sent</button>}
-                  {(b.status==="draft"||b.status==="sent")&&<button onClick={e=>{e.stopPropagation();patchJob(b.id,{status:"accepted"});}} style={{flex:1,padding:10,borderRadius:8,border:"none",background:"#16a34a",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",minWidth:60}}>Won</button>}
-                  {b.status==="sent"&&<button onClick={e=>{e.stopPropagation();patchJob(b.id,{status:"rejected"});}} style={{flex:1,padding:10,borderRadius:8,border:"1px solid #dc2626",background:"#fff",color:"#dc2626",fontWeight:700,fontSize:12,cursor:"pointer",minWidth:60}}>Lost</button>}
+                  </div>
+                  <div style={{fontSize:10,color:"#64748b",marginTop:2}}>{it.amperage_rating||it.amperageRating?(it.amperage_rating||it.amperageRating)+"A":""} {it.voltage_rating||it.voltageRating?(it.voltage_rating||it.voltageRating)+"V":""} {it.kva_rating||it.kvaRating?(it.kva_rating||it.kvaRating)+"KVA":""} . S/N: {it.serial_number||it.serialNumber||"N/A"}</div>
+                  {(j.mode==="pickup"||j.mode==="walkthrough")&&it.pickup_status!=="completed"&&<button onClick={()=>pickupItem(j,it,ii)} style={{marginTop:6,padding:"6px 12px",borderRadius:6,border:"none",background:"#16a34a",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>Mark Picked Up &rarr; Inventory</button>}
+                  {it.pickup_status==="completed"&&it.receive_status!=="verified"&&<button onClick={()=>openReceiveModal(j.id,ii,it)} style={{marginTop:6,padding:"6px 12px",borderRadius:6,border:"none",background:"#2563eb",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>Verify Receive &amp; Putaway</button>}
                 </div>
-              </div>}
-            </div>);
-        })}
+              ))}
+              <div style={{display:"flex",gap:6,marginTop:8}}>
+                <button onClick={()=>exportCSV(j)} style={{flex:1,padding:"10px 0",borderRadius:8,border:"1px solid #2563eb",background:"#fff",color:"#2563eb",fontSize:12,fontWeight:700,cursor:"pointer"}}>Export CSV</button>
+                <button onClick={()=>sendWhatsApp()} style={{flex:1,padding:"10px 0",borderRadius:8,border:"none",background:"#25D366",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>WhatsApp</button>
+              </div>
+            </div>}
+          </div>
+        ))}
       </div>}
 
-      {/* ==== INVENTORY ==== */}
       {view==="inventory"&&<div>
-        {/* Search bar */}
-        <div style={{marginBottom:10}}>
-          <input style={{...inp,fontSize:15,padding:"14px 16px",background:"#fff"}} value={invSearch} onChange={e=>setInvSearch(e.target.value)} placeholder="Search S/N, model, catalog #, manufacturer..."/>
+        <div style={card}>
+          <div style={{fontSize:14,fontWeight:800,marginBottom:10}}>Inventory ({inv.length})</div>
+          <input style={inp} value={invSearch} onChange={e=>setInvSearch(e.target.value)} placeholder="Search S/N, model, mfr, location..."/>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
+            <select style={{...inpSm,flex:1}} value={invFilterType} onChange={e=>setInvFilterType(e.target.value)}><option value="">All types</option>{EQ.map(t=><option key={t}>{t}</option>)}</select>
+            <select style={{...inpSm,flex:1}} value={invFilterGrade} onChange={e=>setInvFilterGrade(e.target.value)}><option value="">All grades</option>{GRD.map(g=><option key={g.v} value={g.v}>{g.v}</option>)}</select>
+            <select style={{...inpSm,flex:1}} value={invFilterLoc} onChange={e=>setInvFilterLoc(e.target.value)}><option value="">All locations</option>{LOC.map(l=><option key={l.v} value={l.v}>{l.l}</option>)}</select>
+          </div>
         </div>
-
-        {/* Filter chips */}
-        <div style={{display:"flex",gap:6,marginBottom:8,overflowX:"auto",paddingBottom:4}}>
-          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:invFilterType?"#3d5e3f":"#94a3b8"}} value={invFilterType} onChange={e=>setInvFilterType(e.target.value)}>
-            <option value="">All Types</option>{EQ.map(t=><option key={t}>{t}</option>)}
-          </select>
-          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:invFilterGrade?"#3d5e3f":"#94a3b8"}} value={invFilterGrade} onChange={e=>setInvFilterGrade(e.target.value)}>
-            <option value="">All Grades</option>{GRD.map(g=><option key={g.v} value={g.v}>{g.v} - {g.d}</option>)}
-          </select>
-          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:invFilterLoc?"#3d5e3f":"#94a3b8"}} value={invFilterLoc} onChange={e=>setInvFilterLoc(e.target.value)}>
-            <option value="">All Locations</option>{LOC.map(l=><option key={l.v} value={l.v}>{l.l}</option>)}
-          </select>
-          <select style={{padding:"8px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:11,fontWeight:600,background:"#fff",color:"#94a3b8"}} value={invSort} onChange={e=>setInvSort(e.target.value)}>
-            <option value="date_desc">Newest</option>
-            <option value="date_asc">Oldest</option>
-            <option value="type">Type</option>
-            <option value="mfr">Manufacturer</option>
-            <option value="value_desc">Value High</option>
-            <option value="value_asc">Value Low</option>
-          </select>
-        </div>
-
-        {/* Active filter summary + clear */}
-        {(invSearch||invFilterType||invFilterGrade||invFilterLoc)&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-          <span style={{fontSize:11,color:"#64748b"}}>
-            {inv.filter(item=>{
-              const q=invSearch.toLowerCase();
-              const matchSearch=!q||[item.serial_number,item.model_number,item.manufacturer,item.catalog_number,item.equipment_type,item.barcode_sku,item.voltage_rating,item.amperage_rating,item.kva_rating,item.frame_size].some(f=>f&&String(f).toLowerCase().includes(q));
-              const matchType=!invFilterType||item.equipment_type===invFilterType;
-              const matchGrade=!invFilterGrade||item.grade===invFilterGrade;
-              const matchLoc=!invFilterLoc||item.location===invFilterLoc;
-              return matchSearch&&matchType&&matchGrade&&matchLoc;
-            }).length} of {inv.length} items
-          </span>
-          <button onClick={()=>{setInvSearch("");setInvFilterType("");setInvFilterGrade("");setInvFilterLoc("");}} style={{padding:"4px 10px",borderRadius:6,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontWeight:600,fontSize:10,cursor:"pointer"}}>Clear All</button>
-        </div>}
-
-        {invLoading&&<div style={{textAlign:"center",padding:40,color:"#94a3b8"}}>Loading inventory...</div>}
-
-        {!invLoading&&inv.length===0&&<div style={{textAlign:"center",padding:40}}>
-          <div style={{fontSize:40,marginBottom:8}}>[R] </div>
-          <div style={{fontSize:15,fontWeight:700,color:"#475569"}}>No inventory yet</div>
-          <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>Items appear here after pickup or receive.</div>
-        </div>}
-
-        {!invLoading&&inv
-          .filter(item=>{
-            const q=invSearch.toLowerCase();
-            const matchSearch=!q||[item.serial_number,item.model_number,item.manufacturer,item.catalog_number,item.equipment_type,item.barcode_sku,item.voltage_rating,item.amperage_rating,item.kva_rating,item.frame_size].some(f=>f&&String(f).toLowerCase().includes(q));
-            const matchType=!invFilterType||item.equipment_type===invFilterType;
-            const matchGrade=!invFilterGrade||item.grade===invFilterGrade;
-            const matchLoc=!invFilterLoc||item.location===invFilterLoc;
-            return matchSearch&&matchType&&matchGrade&&matchLoc;
-          })
-          .sort((a,b)=>{
-            if(invSort==="date_desc")return new Date(b.created_at)-new Date(a.created_at);
-            if(invSort==="date_asc")return new Date(a.created_at)-new Date(b.created_at);
-            if(invSort==="type")return(a.equipment_type||"").localeCompare(b.equipment_type||"");
-            if(invSort==="mfr")return(a.manufacturer||"").localeCompare(b.manufacturer||"");
-            if(invSort==="value_desc")return(parseFloat(b.asking_price)||parseFloat(b.acquisition_cost)||0)-(parseFloat(a.asking_price)||parseFloat(a.acquisition_cost)||0);
-            if(invSort==="value_asc")return(parseFloat(a.asking_price)||parseFloat(a.acquisition_cost)||0)-(parseFloat(b.asking_price)||parseFloat(b.acquisition_cost)||0);
-            return 0;
-          })
-          .map((item,idx)=>{
-            const isExp=invExpId===item.id;
-            const gradeColor=gc[item.grade]||"#6b7280";
-            return(
-            <div key={item.id} style={{...card,borderLeft:`4px solid ${gradeColor}`,padding:14,marginBottom:8}}>
-              <div onClick={()=>setInvExpId(isExp?null:item.id)} style={{cursor:"pointer"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                  <div style={{flex:1}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                      <span style={{fontSize:13,fontWeight:800,color:"#1e293b"}}>{item.equipment_type||"Unknown"}</span>
-                      {item.manufacturer&&<span style={{fontSize:11,color:"#64748b"}}>{item.manufacturer}</span>}
-                      <span style={{padding:"2px 8px",borderRadius:6,background:gradeColor+"18",color:gradeColor,fontSize:10,fontWeight:800}}>{item.grade}</span>
-                      {item.status&&item.status!=="received"&&<span style={{padding:"2px 6px",borderRadius:6,background:"#6366f118",color:"#6366f1",fontSize:9,fontWeight:700}}>{item.status}</span>}
-                    </div>
-                    <div style={{fontSize:11,color:"#64748b",marginTop:3}}>
-                      {item.kva_rating?`${item.kva_rating}KVA`:""}{item.amperage_rating?`${item.kva_rating?" . ":""}${item.amperage_rating}A`:""}{item.frame_size?`${(item.kva_rating||item.amperage_rating)?" . ":""}${item.frame_size}A frame`:""}{item.voltage_rating?` . ${item.voltage_rating}V`:""}{item.serial_number?` . S/N:${item.serial_number}`:""}
-                    </div>
-                  </div>
-                  <div style={{textAlign:"right",flexShrink:0}}>
-                    <div style={{fontSize:13,fontWeight:800,color:item.asking_price?"#16a34a":"#94a3b8"}}>{item.asking_price?`$${parseFloat(item.asking_price).toFixed(0)}`:""}</div>
-                    <div style={{fontSize:9,color:"#94a3b8"}}>{isExp?"v":">"}</div>
+        {invLoading?<div style={{textAlign:"center",padding:40,color:"#94a3b8"}}>Loading inventory...</div>:
+        (()=>{
+          let filtered=inv;
+          if(invSearch){const q=invSearch.toLowerCase();filtered=filtered.filter(r=>[r.serial_number,r.model_number,r.catalog_number,r.manufacturer,r.equipment_type,r.location_detail,r.putaway_location,r.barcode_sku,r.id].some(v=>v&&String(v).toLowerCase().includes(q)));}
+          if(invFilterType)filtered=filtered.filter(r=>r.equipment_type===invFilterType);
+          if(invFilterGrade)filtered=filtered.filter(r=>r.grade===invFilterGrade);
+          if(invFilterLoc)filtered=filtered.filter(r=>r.location===invFilterLoc);
+          if(filtered.length===0)return <div style={{...card,textAlign:"center",color:"#94a3b8",padding:40}}>No matches.</div>;
+          return filtered.map(r=>(
+            <div key={r.id} style={{...card,borderLeft:`4px solid ${gc[r.grade]||"#6b7280"}`,padding:12}}>
+              <div onClick={()=>setInvExpId(invExpId===r.id?null:r.id)} style={{cursor:"pointer"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{fontSize:13,fontWeight:800}}>{r.id}</div>
+                  <div style={{display:"flex",gap:4}}>
+                    <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:(gc[r.grade]||"#6b7280")+"18",color:gc[r.grade],fontWeight:700}}>{r.grade}</span>
+                    {r.physical_state==="on_shelf"&&r.parent_id===null&&<span style={{fontSize:9,padding:"2px 5px",borderRadius:4,background:"#ede9fe",color:"#7c3aed",fontWeight:700}}>PARENT</span>}
+                    {r.physical_state==="in_parent"&&<span style={{fontSize:9,padding:"2px 5px",borderRadius:4,background:"#fef3c7",color:"#78350f",fontWeight:700}}>IN PARENT</span>}
+                    {r.physical_state==="extracted"&&<span style={{fontSize:9,padding:"2px 5px",borderRadius:4,background:"#dbeafe",color:"#1d4ed8",fontWeight:700}}>EXTRACTED</span>}
+                    {r.status==="pending_decomm"&&<span style={{fontSize:9,padding:"2px 5px",borderRadius:4,background:"#fee2e2",color:"#991b1b",fontWeight:700}}>DECOMM</span>}
                   </div>
                 </div>
-                {/* Location + SKU badges */}
-                <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
-                  {item.putaway_location&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#8b5cf618",color:"#8b5cf6",fontWeight:600}}>[LOC] {item.putaway_location}</span>}
-                  {item.barcode_sku&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#f59e0b18",color:"#f59e0b",fontWeight:600}}>SKU: {item.barcode_sku}</span>}
-                  {item.location&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#0369a118",color:"#0369a1",fontWeight:600}}>{LOC.find(l=>l.v===item.location)?.l||item.location}</span>}
-                  {item.catalog_number&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#47556918",color:"#475569",fontWeight:600}}>Cat: {item.catalog_number}</span>}
-                  {item.job_number&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#3d5e3f18",color:"#3d5e3f",fontWeight:600}}>Job: {item.job_number}</span>}
-                </div>
+                <div style={{fontSize:11,color:"#64748b",marginTop:3}}>{r.equipment_type} . {r.manufacturer||"?"} . {r.model_number||""}</div>
+                <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{r.amperage_rating?r.amperage_rating+"A":""}{r.voltage_rating?" / "+r.voltage_rating+"V":""}{r.kva_rating?" / "+r.kva_rating+"KVA":""} . S/N: {r.serial_number||"N/A"} . {(LOC.find(l=>l.v===r.location)?.l)||r.location||""}{r.location_detail?" / "+r.location_detail:""}{r.putaway_location?" . PUT: "+r.putaway_location:""}</div>
               </div>
-
-              {/* Expanded detail */}
-              {isExp&&<div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #e5e7eb"}}>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>{item.tracking_mode==="quantity"?"QTY":"S/N"}</div><div style={{fontSize:12,fontWeight:600}}>{item.tracking_mode==="quantity"?`${item.qty} units`:(item.serial_number||"N/A")}</div></div>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Model</div><div style={{fontSize:12,fontWeight:600}}>{item.model_number||"N/A"}</div></div>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Cat #</div><div style={{fontSize:12,fontWeight:600}}>{item.catalog_number||"N/A"}</div></div>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:10}}>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Amps</div><div style={{fontSize:12,fontWeight:600}}>{item.amperage_rating||"--"}</div></div>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Volts</div><div style={{fontSize:12,fontWeight:600}}>{item.voltage_rating||"--"}</div></div>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>KVA</div><div style={{fontSize:12,fontWeight:600}}>{item.kva_rating||"--"}</div></div>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Phase</div><div style={{fontSize:12,fontWeight:600}}>{item.phase||"--"}</div></div>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:10}}>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>NEMA</div><div style={{fontSize:12,fontWeight:600}}>{item.nema_rating||"--"}</div></div>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>In/Out</div><div style={{fontSize:12,fontWeight:600}}>{item.indoor_outdoor||"--"}</div></div>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Year</div><div style={{fontSize:12,fontWeight:600}}>{item.year_manufactured||"--"}</div></div>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>kAIC</div><div style={{fontSize:12,fontWeight:600}}>{item.interrupting_rating||"--"}</div></div>
-                </div>
-
-                {/* Transformer details */}
-                {(item.winding_hv||item.cooling_class||item.liquid_type||item.kva_forced)&&<div style={{background:"#f5f3ff",borderRadius:8,padding:10,marginBottom:8}}>
-                  <div style={{fontSize:10,fontWeight:700,color:"#7c3aed",marginBottom:4}}>Transformer</div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:4}}>
-                    {item.kva_forced&&<div><div style={{fontSize:9,color:"#94a3b8"}}>KVA FA</div><div style={{fontSize:11,fontWeight:600}}>{item.kva_forced}</div></div>}
-                    {item.cooling_class&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Class</div><div style={{fontSize:11,fontWeight:600}}>{item.cooling_class}</div></div>}
-                    {item.liquid_type&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Liquid</div><div style={{fontSize:11,fontWeight:600}}>{item.liquid_type}</div></div>}
-                    {item.winding_hv&&<div><div style={{fontSize:9,color:"#94a3b8"}}>HV/LV Wind</div><div style={{fontSize:11,fontWeight:600}}>{item.winding_hv}{item.winding_lv?`/${item.winding_lv}`:""}</div></div>}
-                  </div>
-                </div>}
-
-                {/* Breaker details */}
-                {(item.frame_size||item.trip_rating||item.breaker_type||item.trip_unit_type)&&<div style={{background:"#eff6ff",borderRadius:8,padding:10,marginBottom:8}}>
-                  <div style={{fontSize:10,fontWeight:700,color:"#0369a1",marginBottom:4}}>Breaker</div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:4}}>
-                    {item.frame_size&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Frame</div><div style={{fontSize:11,fontWeight:600}}>{item.frame_size}A</div></div>}
-                    {item.trip_rating&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Trip</div><div style={{fontSize:11,fontWeight:600}}>{item.trip_rating}A</div></div>}
-                    {item.breaker_type&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Type</div><div style={{fontSize:11,fontWeight:600}}>{item.breaker_type}</div></div>}
-                    {item.mounting_type&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Mount</div><div style={{fontSize:11,fontWeight:600}}>{item.mounting_type}</div></div>}
-                  </div>
-                  {item.trip_unit_type&&<div style={{marginTop:4}}><div style={{fontSize:9,color:"#94a3b8"}}>Trip Unit</div><div style={{fontSize:11,fontWeight:600}}>{item.trip_unit_type}</div></div>}
-                </div>}
-
-                {/* Switchgear details */}
-                {(item.bus_rating||item.short_circuit_rating||item.bil_kv||item.switchgear_type)&&<div style={{background:"#ecfdf5",borderRadius:8,padding:10,marginBottom:8}}>
-                  <div style={{fontSize:10,fontWeight:700,color:"#059669",marginBottom:4}}>Switchgear</div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:4}}>
-                    {item.bus_rating&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Bus</div><div style={{fontSize:11,fontWeight:600}}>{item.bus_rating}A</div></div>}
-                    {item.short_circuit_rating&&<div><div style={{fontSize:9,color:"#94a3b8"}}>SC</div><div style={{fontSize:11,fontWeight:600}}>{item.short_circuit_rating}</div></div>}
-                    {item.bil_kv&&<div><div style={{fontSize:9,color:"#94a3b8"}}>BIL</div><div style={{fontSize:11,fontWeight:600}}>{item.bil_kv}kV</div></div>}
-                    {item.switchgear_type&&<div><div style={{fontSize:9,color:"#94a3b8"}}>Type</div><div style={{fontSize:11,fontWeight:600}}>{item.switchgear_type}</div></div>}
-                  </div>
-                </div>}
-
-                {/* Financial */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Cost</div><div style={{fontSize:12,fontWeight:700}}>{item.acquisition_cost?`$${parseFloat(item.acquisition_cost).toFixed(0)}`:"--"}</div></div>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Refurb</div><div style={{fontSize:12,fontWeight:700}}>{item.refurb_cost?`$${parseFloat(item.refurb_cost).toFixed(0)}`:"--"}</div></div>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>Ask</div><div style={{fontSize:12,fontWeight:700,color:"#16a34a"}}>{item.asking_price?`$${parseFloat(item.asking_price).toFixed(0)}`:"--"}</div></div>
-                </div>
-
-                {/* Meta */}
-                <div style={{fontSize:10,color:"#94a3b8"}}>
-                  Received: {item.date_received||"--"}{item.source_job_site?` | From: ${item.source_job_site}`:""}{item.customer_origin?` | Customer: ${item.customer_origin}`:""}
-                </div>
-                {item.condition_notes&&<div style={{fontSize:10,color:"#64748b",marginTop:4,fontStyle:"italic"}}>{item.condition_notes}</div>}
+              {invExpId===r.id&&<div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #e5e7eb",fontSize:11,color:"#475569"}}>
+                <div><strong>Received:</strong> {r.date_received} by {r.scanned_by||"-"}</div>
+                {r.customer_origin&&<div><strong>Source:</strong> {r.customer_origin}</div>}
+                {r.source_job_site&&<div><strong>Job:</strong> {r.source_job_site}</div>}
+                {r.parent_id&&<div><strong>Parent:</strong> {r.parent_id}{r.position_in_parent?` (Pos ${r.position_in_parent})`:""}</div>}
+                {r.bus_rating&&<div><strong>Bus:</strong> {r.bus_rating}A {r.voltage_class||""}</div>}
+                {r.condition_notes&&<div style={{marginTop:4}}><strong>Notes:</strong> {r.condition_notes}</div>}
               </div>}
-            </div>);
-          })
-        }
-
-        {/* Refresh button */}
-        {!invLoading&&inv.length>0&&<div style={{textAlign:"center",padding:12}}>
-          <button onClick={loadInventory} style={{padding:"10px 24px",borderRadius:8,border:"1px solid #d1d5db",background:"#fff",color:"#475569",fontWeight:600,fontSize:12,cursor:"pointer"}}>Refresh</button>
-        </div>}
+            </div>
+          ));
+        })()}
       </div>}
 
-      {/* === RECEIVE VERIFICATION MODAL === */}
-      {recvModal&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:9998,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setRecvModal(null)}>
-        <div style={{background:"#fff",borderRadius:16,padding:20,maxWidth:400,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
-          <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>Verify Receipt</div>
-          <div style={{fontSize:12,color:"#6b7280",marginBottom:16}}>{recvModal.item.equipment_type} {recvModal.item.manufacturer||""} {recvModal.item.amperage_rating?recvModal.item.amperage_rating+"A":""}<br/>S/N: {recvModal.item.serial_number||"N/A"} | {recvModal.item.inventory_id||""}</div>
-
-          <div style={{marginBottom:12}}>
-            <ScanInput label="Putaway Location (scan bin/rack barcode)" value={recvPutaway} onChange={setRecvPutaway} placeholder="LOC-A1-01"/>
-          </div>
-          <div style={{marginBottom:12}}>
-            <ScanInput label="SKU / Barcode (scan or assign)" value={recvSku} onChange={setRecvSku} placeholder="HDN-00001"/>
-          </div>
-          <div style={{marginBottom:16}}>
-            <label style={{display:"block",fontSize:10,fontWeight:600,color:"#6b7280",marginBottom:2}}>Verified By</label>
-            <input style={{width:"100%",padding:"10px 12px",border:"1.5px solid #d1d5db",borderRadius:10,fontSize:14,background:"#fff",color:"#111",boxSizing:"border-box",outline:"none",fontFamily:"inherit"}} value={recvBy} onChange={e=>setRecvBy(e.target.value)} placeholder="Your name"/>
-          </div>
-
+      {recvModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:9998,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{background:"#fff",borderRadius:14,padding:20,maxWidth:420,width:"100%",maxHeight:"90vh",overflowY:"auto"}}>
+          <div style={{fontSize:15,fontWeight:800,marginBottom:6}}>Verify Receive &amp; Putaway</div>
+          <div style={{fontSize:11,color:"#64748b",marginBottom:14}}>{recvModal.item.equipment_type||recvModal.item.equipmentType} . {recvModal.item.inventory_id||""}</div>
+          <div style={{marginBottom:10}}><label style={lbl}>Verified By *</label><input style={inp} value={recvBy} onChange={e=>setRecvBy(e.target.value)} placeholder="Your name"/></div>
+          <div style={{marginBottom:10}}><ScanInput label="Putaway Location" value={recvPutaway} onChange={setRecvPutaway} placeholder="Scan or type bin/rack..."/></div>
+          <div style={{marginBottom:14}}><ScanInput label="SKU / Barcode" value={recvSku} onChange={setRecvSku} placeholder="Scan or assign SKU..."/></div>
           <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>setRecvModal(null)} style={{flex:1,padding:14,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#6b7280",fontWeight:700,fontSize:14,cursor:"pointer"}}>Cancel</button>
-            <button onClick={confirmReceive} style={{flex:2,padding:14,borderRadius:10,border:"none",background:"linear-gradient(135deg,#8b5cf6,#7c3aed)",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>{"\u2713"} Confirm Received</button>
+            <button onClick={()=>setRecvModal(null)} style={{flex:1,padding:12,borderRadius:8,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+            <button onClick={confirmReceive} style={{flex:2,padding:12,borderRadius:8,border:"none",background:"#2563eb",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Confirm Verified</button>
           </div>
         </div>
       </div>}
-    </div>);
+    </div>
+  );
 }
