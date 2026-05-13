@@ -50,7 +50,8 @@ async function sG(k){try{if(typeof window!=="undefined"&&window.storage){const r
 async function sS(k,v){try{if(typeof window!=="undefined"&&window.storage)await window.storage.set(k,JSON.stringify(v));}catch{}}
 
 /* -- Constants ------------------------------------------- */
-const EQ=["Switchgear","Panelboard","Transformer","Circuit Breaker","Motor Control Center (MCC)","Bus Duct","Disconnect Switch","UPS System","PDU","RPP (Remote Power Panel)","ATS / Transfer Switch","VFD / Drive","Motor Starter","Control Transformer","Trip Unit","Relay","CT / PT","Meter","Other"];
+const EQ=["Switchgear","Panelboard","Transformer","Circuit Breaker","Motor Control Center (MCC)","Bus Duct","Disconnect Switch","UPS System","PDU","RPP (Remote Power Panel)","ATS / Transfer Switch","VFD / Drive","Motor Starter","Control Transformer","Trip Unit","Relay","CT / PT","Meter","Bin Breaker","Mounting Kit","Gasket","Bus Bar","Wire","Inner","Nuts and Bolts","Other"];
+const BULK_TYPES=new Set(["Bin Breaker","Mounting Kit","Gasket","Bus Bar","Wire","Inner","Nuts and Bolts"]);
 const MFR=["Eaton / Cutler-Hammer","Siemens","Square D / Schneider","ABB","GE","Westinghouse","ITE","Federal Pacific","Allen-Bradley / Rockwell","Mitsubishi","Yaskawa","Danfoss","Liebert / Vertiv","APC / Schneider","ABL Sursum","Other"];
 const GRD=[{v:"A",c:"#16a34a",d:"Excellent"},{v:"B",c:"#2563eb",d:"Good"},{v:"C",c:"#f59e0b",d:"Fair"},{v:"D",c:"#dc2626",d:"Scrap"}];
 const gc={};GRD.forEach(g=>gc[g.v]=g.c);
@@ -264,6 +265,13 @@ export default function Walkthrough() {
   const [items,setItems]=useState([]);
   const [errs,setErrs]=useState({});
 
+  /* -- Quick Capture mode -- */
+  const [qcPhase,setQcPhase]=useState("location"); // location | capture | analyzing | review | saving
+  const [qcLocationCode,setQcLocationCode]=useState(""); // free-text location from existing sticker
+  const [qcItem,setQcItem]=useState(null);
+  const [qcCount,setQcCount]=useState(0);
+  const qcFileRef=useRef(null);
+
   /* -- Load reference data -- */
   useEffect(()=>{(async()=>{
     try{if(!loc){
@@ -391,6 +399,146 @@ export default function Walkthrough() {
     }catch{}
     setItems(prev=>prev.map((it,i)=>i===idx?{...it,photos:[...(it.photos||[]),photoUrl]}:it));
   };
+
+  /* -- Quick Capture: scan handler -- */
+  const handleQuickScan=async(file)=>{
+    if(!file)return;
+    setQcPhase("analyzing");setMsg(null);
+    try{
+      const compressed=await compressImage(file);
+      const b64=compressed.split(",")[1];
+      // Upload photo to storage (parallel with AI call)
+      let photoUrl=compressed;
+      const upPromise=(async()=>{
+        try{
+          const blob=await(await fetch(compressed)).blob();
+          const fname=`${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
+          const upResp=await fetch(`${SB}/storage/v1/object/item-photos/${fname}`,{method:"POST",headers:{apikey:SK,Authorization:`Bearer ${SK}`,"Content-Type":"image/jpeg"},body:blob});
+          if(upResp.ok)photoUrl=`${SB}/storage/v1/object/public/item-photos/${fname}`;
+        }catch{}
+      })();
+      // AI scan
+      const resp=await fetch(`${SB}/functions/v1/scan-nameplate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image_base64:b64,media_type:"image/jpeg"})});
+      if(!resp.ok)throw new Error(`AI ${resp.status}`);
+      const p=await resp.json();
+      if(p.error)throw new Error(p.error);
+      await upPromise;
+      // Fuzzy-match mfr and eq type against known lists
+      const mfrMatch=MFR.find(m=>{
+        if(!p.manufacturer)return false;
+        const raw=p.manufacturer.toLowerCase().trim();
+        const parts=m.toLowerCase().split(/[\/\s]+/);
+        return parts.some(part=>part.length>2&&raw.includes(part))||raw.includes(m.toLowerCase());
+      });
+      const eqMatch=EQ.find(t=>p.equipment_type&&t.toLowerCase().includes(p.equipment_type.toLowerCase()))||EQ.find(t=>p.equipment_type&&p.equipment_type.toLowerCase().includes(t.toLowerCase()));
+      setQcItem({
+        photo:photoUrl,
+        equipmentType:eqMatch||"",
+        manufacturer:mfrMatch||p.manufacturer||"",
+        modelNumber:p.model_number||p.catalog_number||"",
+        catalogNumber:p.catalog_number||p.model_number||"",
+        serialNumber:p.serial_number||"",
+        voltageRating:p.voltage_rating||"",
+        amperageRating:p.amperage_rating||"",
+        kvaRating:p.kva_rating||"",
+        phase:p.phase?String(p.phase).replace(/[^0-9]/g,""):"3",
+        yearMfg:p.year_manufactured||"",
+        grade:"C",
+        qty:1,
+        _ai:p, // keep raw AI output for attribute writes
+      });
+      setQcPhase("review");
+    }catch(e){
+      setMsg({t:"error",m:"Scan failed: "+e.message+". Try again or skip to manual entry."});
+      setQcPhase("capture");
+    }
+  };
+
+  /* -- Capture-Receive: write to inventory_items (used by both Quick + Receive modes) -- */
+  const handleQuickReceive=async(then)=>{
+    if(!qcItem){setMsg({t:"error",m:"No item to save"});return;}
+    if(mode==="quick"&&!qcLocationCode.trim()){
+      setMsg({t:"error",m:"Set location first"});setQcPhase("location");return;
+    }
+    if(mode==="receive"&&!job.preparedBy.trim()){
+      setMsg({t:"error",m:"Received By required"});setQcPhase("location");return;
+    }
+    if(!qcItem.equipmentType){setMsg({t:"error",m:"Pick an equipment type"});return;}
+    setQcPhase("saving");
+    try{
+      const invId=`INV-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,5)}`;
+      const isBulk=BULK_TYPES.has(qcItem.equipmentType);
+      const sn=(qcItem.serialNumber||"").trim();
+      const p=qcItem._ai||{};
+      const invRow={
+        id:invId,
+        tracking_mode:isBulk?"quantity":"serialized",
+        qty:isBulk?(parseInt(qcItem.qty)||1):1,
+        serial_number:isBulk?null:(sn||"UNKNOWN"),
+        model_number:qcItem.modelNumber||null,
+        catalog_number:qcItem.catalogNumber||null,
+        manufacturer:qcItem.manufacturer||null,
+        equipment_type:qcItem.equipmentType,
+        voltage_rating:qcItem.voltageRating||null,
+        amperage_rating:qcItem.amperageRating||null,
+        grade:qcItem.grade||"C",
+        location:"main_warehouse",
+        location_detail:mode==="quick"?qcLocationCode.trim():null,
+        customer_origin:mode==="receive"?(job.customerName||null):null,
+        source_job_site:mode==="receive"?(job.jobName||null):null,
+        status:"received",
+        date_received:mode==="receive"?(job.bidDate||today()):today(),
+        scanned_by:mode==="receive"?(job.preparedBy||"receive"):"quick_capture",
+        kva_rating:qcItem.kvaRating||null,
+        phase:qcItem.phase||"3",
+        year_manufactured:qcItem.yearMfg?parseInt(qcItem.yearMfg)||null:null,
+        frame_size:p.frame_size||null,
+        trip_rating:p.trip_rating||null,
+        interrupting_rating:p.interrupting_rating||null,
+        breaker_type:p.breaker_type||null,
+        bus_rating:p.bus_rating||null,
+        bil_kv:p.bil_kv||null,
+        voltage_class:p.voltage_class||null,
+        cooling_class:p.cooling_class||null,
+        liquid_type:p.liquid_type||null,
+        winding_hv:p.winding_hv||null,
+        winding_lv:p.winding_lv||null,
+        winding_material:p.winding_material||null,
+        received_verified:true,
+        verified_by:mode==="receive"?(job.preparedBy||"receive"):"quick_capture",
+        verified_date:mode==="receive"?(job.bidDate||today()):today(),
+      };
+      let ok=false;
+      if(!loc){try{
+        await dbF("inventory_items",{method:"POST",body:JSON.stringify(invRow)});
+        // Save photo to item_photos if uploaded successfully
+        if(qcItem.photo&&qcItem.photo.startsWith(SB)){try{
+          await dbF("item_photos",{method:"POST",body:JSON.stringify({
+            reference_id:invId,reference_type:"inventory_item",photo_url:qcItem.photo,photo_role:"nameplate",is_ebay_ready:false,
+          })});
+        }catch{}}
+        ok=true;
+      }catch{loc=true;}}
+      if(!ok){
+        const stored=await sG("wes_inv")||[];
+        await sS("wes_inv",[{...invRow,_photo:qcItem.photo,created_at:new Date().toISOString()},...stored]);
+      }
+      setQcCount(c=>c+1);
+      setQcItem(null);
+      setMsg({t:"success",m:`Saved. ${qcCount+1} captured this session.`});
+      if(then==="finish"){
+        setQcPhase("location");setQcCount(0);setView("inventory");loadInventory();
+      }else{
+        setQcPhase("capture");
+        // Auto-open camera for next item
+        setTimeout(()=>qcFileRef.current?.click(),100);
+      }
+    }catch(e){
+      setMsg({t:"error",m:e.message});
+      setQcPhase("review");
+    }
+  };
+
 
   /* -- Item management -- */
   const addItem=()=>setItems(p=>[...p,{
@@ -548,8 +696,14 @@ export default function Walkthrough() {
         const bkrCount=bkrs.reduce((a,b)=>a+(b.count||0),0);
         const bkrDetail=bkrs.map(b=>`${b.count}x ${b.amp}A ${b.poles}P ${b.grade} ${b.oem}${b.pitting?" PITTING":""}${b.contactWear?" WEAR":""}`).join("; ");
 
+        const isBulk=BULK_TYPES.has(it.equipmentType);
+        const sn=(it.serialNumber||"").trim();
         const invRow={
-          id:invId,serial_number:it.serialNumber||"N/A",model_number:it.modelNumber||null,
+          id:invId,
+          tracking_mode:isBulk?"quantity":"serialized",
+          qty:isBulk?(parseInt(it.quantity)||1):1,
+          serial_number:isBulk?null:(sn||"UNKNOWN"),
+          model_number:it.modelNumber||null,
           manufacturer:it.manufacturer||null,equipment_type:it.equipmentType,
           voltage_rating:it.voltageRating||null,amperage_rating:it.amperageRating||null,
           grade:it.grade,condition_notes:[it.conditionNotes,bkrDetail?`Breakers: ${bkrDetail}`:""].filter(Boolean).join(" | ")||null,
@@ -657,9 +811,14 @@ export default function Walkthrough() {
   /* -- Pickup: create inventory record from bid line item -- */
   const pickupItem=async(jobData,lineItem,lineIdx)=>{
     const invId=`INV-${Date.now().toString(36).toUpperCase()}`;
+    const eqType=lineItem.equipment_type||lineItem.equipmentType||"";
+    const isBulk=BULK_TYPES.has(eqType);
+    const sn=(lineItem.serial_number||lineItem.serialNumber||"").trim();
     const invRow={
       id:invId,
-      serial_number:lineItem.serial_number||lineItem.serialNumber||"",
+      tracking_mode:isBulk?"quantity":"serialized",
+      qty:isBulk?(parseInt(lineItem.quantity)||1):1,
+      serial_number:isBulk?null:(sn||"UNKNOWN"),
       model_number:lineItem.model_number||lineItem.modelNumber||null,
       manufacturer:lineItem.manufacturer||null,
       equipment_type:lineItem.equipment_type||lineItem.equipmentType||"",
@@ -847,13 +1006,13 @@ export default function Walkthrough() {
 
       {/* Mode toggle */}
       {view==="new"&&<div style={{display:"flex",gap:4,marginBottom:12}}>
-        {[{m:"walkthrough",i:"[W]",l:"Walkthrough"},{m:"pickup",i:"[P]",l:"Pickup"},{m:"receive",i:"[R]",l:"Receive"}].map(({m,i,l})=><button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"12px 0",borderRadius:10,border:`2.5px solid ${mode===m?"#3d5e3f":"#e2e8f0"}`,background:mode===m?"#3d5e3f":"#fff",color:mode===m?"#fff":"#64748b",fontWeight:800,fontSize:13,cursor:"pointer"}}>{i} {l}</button>)}
+        {[{m:"walkthrough",i:"[W]",l:"Walkthrough"},{m:"pickup",i:"[P]",l:"Pickup"},{m:"receive",i:"[R]",l:"Receive"},{m:"quick",i:"[Q]",l:"Quick"}].map(({m,i,l})=><button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"12px 0",borderRadius:10,border:`2.5px solid ${mode===m?(m==="quick"?"#0891b2":"#3d5e3f"):"#e2e8f0"}`,background:mode===m?(m==="quick"?"#0891b2":"#3d5e3f"):"#fff",color:mode===m?"#fff":"#64748b",fontWeight:800,fontSize:12,cursor:"pointer"}}>{i} {l}</button>)}
       </div>}
 
       {msg&&<div style={{padding:"12px",background:msg.t==="error"?"#fef2f2":msg.t==="info"?"#eff6ff":"#ecfdf5",border:`1px solid ${msg.t==="error"?"#fecaca":msg.t==="info"?"#bfdbfe":"#a7f3d0"}`,borderRadius:10,color:msg.t==="error"?"#dc2626":msg.t==="info"?"#1d4ed8":"#065f46",fontSize:13,marginBottom:12,display:"flex",justifyContent:"space-between"}}><span>{msg.m}</span><button onClick={()=>setMsg(null)} style={{background:"none",border:"none",fontWeight:700,cursor:"pointer",color:"inherit"}}>&times;</button></div>}
 
-      {/* ==== NEW ==== */}
-      {view==="new"&&<div>
+      {/* ==== NEW (Walkthrough + Pickup heavy form) ==== */}
+      {view==="new"&&(mode==="walkthrough"||mode==="pickup")&&<div>
         {/* Job Info (walkthrough/pickup only) */}
         {mode!=="receive"&&<div style={card}>
           <div style={{fontSize:15,fontWeight:800,marginBottom:12}}>Job Info</div>
@@ -1183,6 +1342,157 @@ export default function Walkthrough() {
         <div style={card}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:60,resize:"vertical"}} value={job.notes} onChange={e=>uf("notes",e.target.value)} placeholder="Scope, exclusions, access notes..."/></div>
       </div>}
 
+      {/* ==== QUICK CAPTURE + SIMPLIFIED RECEIVE (shared capture flow) ==== */}
+      {view==="new"&&(mode==="quick"||mode==="receive")&&<div>
+        {/* Sticky session header (visible once we've left the source/location phase) */}
+        {qcPhase!=="location"&&<div style={{position:"sticky",top:0,zIndex:10,background:mode==="receive"?"#16a34a":"#0891b2",color:"#fff",padding:"10px 14px",borderRadius:10,marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontSize:13,fontWeight:700}}>
+            {mode==="quick"?<>
+              <div>Location: {qcLocationCode}</div>
+              <div style={{fontSize:11,opacity:0.85,marginTop:2}}>{qcCount} captured this session</div>
+            </>:<>
+              <div>From: {job.customerName||"(no source)"}{job.jobName?` . ${job.jobName}`:""}</div>
+              <div style={{fontSize:11,opacity:0.85,marginTop:2}}>Received by {job.preparedBy} . {qcCount} received this session</div>
+            </>}
+          </div>
+          <button onClick={()=>setQcPhase("location")} style={{padding:"6px 12px",borderRadius:6,border:"1px solid rgba(255,255,255,0.4)",background:"transparent",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>{mode==="receive"?"Edit info":"Change"}</button>
+        </div>}
+
+        {/* PHASE: LOCATION (Quick mode) — sticker code */}
+        {qcPhase==="location"&&mode==="quick"&&<div style={card}>
+          <div style={{fontSize:18,fontWeight:800,marginBottom:6}}>Where are you walking?</div>
+          <div style={{fontSize:12,color:"#6b7280",marginBottom:16}}>Read the sticker code on the shelf. Type it exactly. Stays set until you change it.</div>
+          <div style={{marginBottom:16}}>
+            <label style={lbl}>Location code</label>
+            <input style={{...inp,fontSize:20,padding:"16px 14px",letterSpacing:1}} value={qcLocationCode} onChange={e=>setQcLocationCode(e.target.value)} placeholder="e.g. 1-2-3-5 or FN" autoFocus/>
+            <div style={{fontSize:11,color:"#6b7280",marginTop:6}}>Saved verbatim. Items get re-located when stock moves from Botham Jean to Hansboro.</div>
+          </div>
+          <button onClick={()=>{
+            if(!qcLocationCode.trim()){setMsg({t:"error",m:"Location code required"});return;}
+            setMsg(null);setQcPhase("capture");
+          }} style={{width:"100%",padding:18,borderRadius:12,border:"none",background:"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>Start Capturing &rarr;</button>
+        </div>}
+
+        {/* PHASE: SOURCE (Receive mode) — receiving info */}
+        {qcPhase==="location"&&mode==="receive"&&<div style={card}>
+          <div style={{fontSize:18,fontWeight:800,marginBottom:6}}>Receiving items</div>
+          <div style={{fontSize:12,color:"#6b7280",marginBottom:16}}>Net-new sellable stock arriving at the dock. Fill once, then capture all items in this load.</div>
+          <div style={{marginBottom:10}}>
+            <label style={lbl}>Received By *</label>
+            <input style={inp} value={job.preparedBy} onChange={e=>uf("preparedBy",e.target.value)} placeholder="Your name" autoFocus/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div><label style={lbl}>Source / Vendor</label><input style={inp} value={job.customerName} onChange={e=>uf("customerName",e.target.value)} placeholder="Customer, vendor, auction"/></div>
+            <div><label style={lbl}>PO / Reference</label><input style={inp} value={job.jobName} onChange={e=>uf("jobName",e.target.value)} placeholder="PO #, lot, job ref"/></div>
+          </div>
+          <div style={{marginBottom:16}}>
+            <label style={lbl}>Date</label>
+            <input style={inp} type="date" value={job.bidDate} onChange={e=>uf("bidDate",e.target.value)}/>
+          </div>
+          <button onClick={()=>{
+            if(!job.preparedBy.trim()){setMsg({t:"error",m:"Received By required"});return;}
+            setMsg(null);setQcPhase("capture");
+          }} style={{width:"100%",padding:18,borderRadius:12,border:"none",background:"linear-gradient(135deg,#16a34a,#15803d)",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>Start Receiving &rarr;</button>
+        </div>}
+
+        {/* PHASE: CAPTURE (camera trigger) */}
+        {qcPhase==="capture"&&<div>
+          <div style={card}>
+            <div style={{textAlign:"center",padding:"20px 0"}}>
+              <div style={{fontSize:48,marginBottom:8}}>[CAM]</div>
+              <div style={{fontSize:14,color:"#6b7280",marginBottom:20}}>Photograph the nameplate or the item itself. AI fills in the rest.</div>
+              <label style={{display:"block",width:"100%",padding:24,borderRadius:14,background:mode==="receive"?"linear-gradient(135deg,#16a34a,#15803d)":"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",fontSize:17,fontWeight:800,cursor:"pointer",textAlign:"center"}}>
+                <input ref={qcFileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];e.target.value="";if(f)handleQuickScan(f);}}/>
+                CAPTURE ITEM
+              </label>
+            </div>
+          </div>
+          <button onClick={()=>{setQcPhase("location");setQcCount(0);setView("inventory");loadInventory();}} style={{width:"100%",padding:14,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#475569",fontSize:14,fontWeight:700,cursor:"pointer"}}>Finish session . View inventory</button>
+        </div>}
+
+        {/* PHASE: ANALYZING */}
+        {qcPhase==="analyzing"&&<div style={card}>
+          <div style={{textAlign:"center",padding:"40px 0"}}>
+            <div style={{fontSize:36,marginBottom:12}}>...</div>
+            <div style={{fontSize:16,fontWeight:700,color:mode==="receive"?"#16a34a":"#0891b2"}}>AI reading item...</div>
+            <div style={{fontSize:12,color:"#6b7280",marginTop:6}}>Identifying type, manufacturer, model, ratings</div>
+          </div>
+        </div>}
+
+        {/* PHASE: REVIEW */}
+        {qcPhase==="review"&&qcItem&&<div>
+          {/* Photo + AI summary */}
+          <div style={card}>
+            {qcItem.photo&&<img src={qcItem.photo} alt="captured" style={{width:"100%",maxHeight:200,objectFit:"cover",borderRadius:10,marginBottom:12}}/>}
+            <div style={{fontSize:11,fontWeight:700,color:"#0891b2",marginBottom:6,letterSpacing:1}}>AI EXTRACTED . CONFIRM OR EDIT</div>
+            <div style={{marginBottom:10}}>
+              <label style={lbl}>Type *</label>
+              <select style={qcItem.equipmentType?inp:inpE} value={qcItem.equipmentType} onChange={e=>setQcItem(i=>({...i,equipmentType:e.target.value}))}>
+                <option value="">-- pick --</option>
+                {EQ.map(t=><option key={t} value={t}>{t}{BULK_TYPES.has(t)?" (bulk)":""}</option>)}
+              </select>
+            </div>
+            <div style={{marginBottom:10}}>
+              <label style={lbl}>Manufacturer</label>
+              <select style={inp} value={MFR.includes(qcItem.manufacturer)?qcItem.manufacturer:""} onChange={e=>setQcItem(i=>({...i,manufacturer:e.target.value}))}>
+                <option value="">-- pick --</option>
+                {MFR.map(m=><option key={m} value={m}>{m}</option>)}
+              </select>
+              {qcItem.manufacturer&&!MFR.includes(qcItem.manufacturer)&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4}}>AI said: "{qcItem.manufacturer}" - pick closest match above</div>}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <div><label style={lbl}>Model</label><input style={inp} value={qcItem.modelNumber} onChange={e=>setQcItem(i=>({...i,modelNumber:e.target.value}))}/></div>
+              <div><label style={lbl}>Catalog #</label><input style={inp} value={qcItem.catalogNumber} onChange={e=>setQcItem(i=>({...i,catalogNumber:e.target.value}))}/></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+              <div><label style={lbl}>Amps</label><input style={inp} value={qcItem.amperageRating} onChange={e=>setQcItem(i=>({...i,amperageRating:e.target.value}))}/></div>
+              <div><label style={lbl}>Volts</label><input style={inp} value={qcItem.voltageRating} onChange={e=>setQcItem(i=>({...i,voltageRating:e.target.value}))}/></div>
+              <div><label style={lbl}>KVA</label><input style={inp} value={qcItem.kvaRating} onChange={e=>setQcItem(i=>({...i,kvaRating:e.target.value}))}/></div>
+            </div>
+          </div>
+
+          {/* Grade picker */}
+          <div style={card}>
+            <label style={lbl}>Grade *</label>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6}}>
+              {GRD.map(g=><button key={g.v} onClick={()=>setQcItem(i=>({...i,grade:g.v}))} style={{padding:"14px 0",borderRadius:10,border:`2.5px solid ${qcItem.grade===g.v?g.c:"#e2e8f0"}`,background:qcItem.grade===g.v?g.c+"15":"#fff",color:qcItem.grade===g.v?g.c:"#94a3b8",fontWeight:800,fontSize:15,cursor:"pointer"}}>{g.v}<div style={{fontSize:9,marginTop:2}}>{g.d}</div></button>)}
+            </div>
+          </div>
+
+          {/* Qty (bulk) or S/N (serialized) */}
+          <div style={card}>
+            {BULK_TYPES.has(qcItem.equipmentType)?<>
+              <label style={lbl}>Quantity *</label>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <button onClick={()=>setQcItem(i=>({...i,qty:Math.max(1,(parseInt(i.qty)||1)-1)}))} style={{width:56,height:56,borderRadius:12,border:"2px solid #0891b2",background:"#fff",color:"#0891b2",fontSize:24,fontWeight:800,cursor:"pointer"}}>-</button>
+                <input type="number" min="1" value={qcItem.qty} onChange={e=>setQcItem(i=>({...i,qty:parseInt(e.target.value)||1}))} style={{flex:1,padding:"14px 0",textAlign:"center",border:"2px solid #0891b2",borderRadius:12,fontSize:28,fontWeight:800,color:"#0891b2"}}/>
+                <button onClick={()=>setQcItem(i=>({...i,qty:(parseInt(i.qty)||1)+1}))} style={{width:56,height:56,borderRadius:12,border:"2px solid #0891b2",background:"#0891b2",color:"#fff",fontSize:24,fontWeight:800,cursor:"pointer"}}>+</button>
+              </div>
+              <div style={{fontSize:11,color:"#6b7280",marginTop:6}}>Bulk item. Stored as one row with count.</div>
+            </>:<>
+              <label style={lbl}>Serial Number</label>
+              <input style={inp} value={qcItem.serialNumber} onChange={e=>setQcItem(i=>({...i,serialNumber:e.target.value}))} placeholder="Leave blank if unreadable"/>
+              <div style={{fontSize:11,color:"#6b7280",marginTop:6}}>Blank serials get saved as &quot;UNKNOWN&quot; for later capture.</div>
+            </>}
+          </div>
+
+          {/* Actions */}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <button onClick={()=>handleQuickReceive("next")} style={{padding:18,borderRadius:12,border:"none",background:mode==="receive"?"linear-gradient(135deg,#16a34a,#15803d)":"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>Receive &amp; Capture Next &rarr;</button>
+            <button onClick={()=>handleQuickReceive("finish")} style={{padding:14,borderRadius:10,border:`2px solid ${mode==="receive"?"#16a34a":"#0891b2"}`,background:"#fff",color:mode==="receive"?"#16a34a":"#0891b2",fontSize:14,fontWeight:700,cursor:"pointer"}}>Receive &amp; Finish Session</button>
+            <button onClick={()=>{setQcItem(null);setQcPhase("capture");}} style={{padding:12,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontSize:13,fontWeight:600,cursor:"pointer"}}>Retake / Discard</button>
+          </div>
+        </div>}
+
+        {/* PHASE: SAVING */}
+        {qcPhase==="saving"&&<div style={card}>
+          <div style={{textAlign:"center",padding:"40px 0"}}>
+            <div style={{fontSize:36,marginBottom:12}}>...</div>
+            <div style={{fontSize:16,fontWeight:700,color:mode==="receive"?"#16a34a":"#0891b2"}}>Saving to inventory...</div>
+          </div>
+        </div>}
+      </div>}
+
       {/* ==== JOB LIST ==== */}
       {view==="jobs"&&<div>
         <div style={{display:"flex",gap:6,marginBottom:14}}>
@@ -1381,7 +1691,7 @@ export default function Walkthrough() {
               {/* Expanded detail */}
               {isExp&&<div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #e5e7eb"}}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
-                  <div><div style={{fontSize:9,color:"#94a3b8"}}>S/N</div><div style={{fontSize:12,fontWeight:600}}>{item.serial_number||"N/A"}</div></div>
+                  <div><div style={{fontSize:9,color:"#94a3b8"}}>{item.tracking_mode==="quantity"?"QTY":"S/N"}</div><div style={{fontSize:12,fontWeight:600}}>{item.tracking_mode==="quantity"?`${item.qty} units`:(item.serial_number||"N/A")}</div></div>
                   <div><div style={{fontSize:9,color:"#94a3b8"}}>Model</div><div style={{fontSize:12,fontWeight:600}}>{item.model_number||"N/A"}</div></div>
                   <div><div style={{fontSize:9,color:"#94a3b8"}}>Cat #</div><div style={{fontSize:12,fontWeight:600}}>{item.catalog_number||"N/A"}</div></div>
                 </div>
