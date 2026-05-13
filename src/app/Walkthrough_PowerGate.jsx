@@ -444,7 +444,8 @@ export default function Walkthrough() {
         phase:p.phase?String(p.phase).replace(/[^0-9]/g,""):"3",
         yearMfg:p.year_manufactured||"",
         grade:"C",
-        qty:1,
+        qty:parseInt(p.quantity_visible)||1,
+        bulkOverride:null, // null=auto (type-based), true=force bulk, false=force serialized
         _ai:p, // keep raw AI output for attribute writes
       });
       setQcPhase("review");
@@ -467,7 +468,7 @@ export default function Walkthrough() {
     setQcPhase("saving");
     try{
       const invId=`INV-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,5)}`;
-      const isBulk=BULK_TYPES.has(qcItem.equipmentType);
+      const isBulk=qcItem.bulkOverride!==null?qcItem.bulkOverride:BULK_TYPES.has(qcItem.equipmentType);
       const sn=(qcItem.serialNumber||"").trim();
       const p=qcItem._ai||{};
       const invRow={
@@ -1006,7 +1007,15 @@ export default function Walkthrough() {
 
       {/* Mode toggle */}
       {view==="new"&&<div style={{display:"flex",gap:4,marginBottom:12}}>
-        {[{m:"walkthrough",i:"[W]",l:"Walkthrough"},{m:"pickup",i:"[P]",l:"Pickup"},{m:"receive",i:"[R]",l:"Receive"},{m:"quick",i:"[Q]",l:"Quick"}].map(({m,i,l})=><button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"12px 0",borderRadius:10,border:`2.5px solid ${mode===m?(m==="quick"?"#0891b2":"#3d5e3f"):"#e2e8f0"}`,background:mode===m?(m==="quick"?"#0891b2":"#3d5e3f"):"#fff",color:mode===m?"#fff":"#64748b",fontWeight:800,fontSize:12,cursor:"pointer"}}>{i} {l}</button>)}
+        {[
+          {m:"walkthrough",i:"[W]",l:"Walkthrough",s:"On-site bid"},
+          {m:"pickup",i:"[P]",l:"Pickup",s:"Job-site load"},
+          {m:"receive",i:"[R]",l:"Receive",s:"Dock arrival"},
+          {m:"quick",i:"[Q]",l:"Quick",s:"Yard sticker walk"}
+        ].map(({m,i,l,s})=><button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"10px 4px",borderRadius:10,border:`2.5px solid ${mode===m?(m==="quick"?"#0891b2":m==="receive"?"#16a34a":"#3d5e3f"):"#e2e8f0"}`,background:mode===m?(m==="quick"?"#0891b2":m==="receive"?"#16a34a":"#3d5e3f"):"#fff",color:mode===m?"#fff":"#64748b",fontWeight:800,fontSize:12,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+          <div>{i} {l}</div>
+          <div style={{fontSize:9,fontWeight:600,opacity:mode===m?0.9:0.7}}>{s}</div>
+        </button>)}
       </div>}
 
       {msg&&<div style={{padding:"12px",background:msg.t==="error"?"#fef2f2":msg.t==="info"?"#eff6ff":"#ecfdf5",border:`1px solid ${msg.t==="error"?"#fecaca":msg.t==="info"?"#bfdbfe":"#a7f3d0"}`,borderRadius:10,color:msg.t==="error"?"#dc2626":msg.t==="info"?"#1d4ed8":"#065f46",fontSize:13,marginBottom:12,display:"flex",justifyContent:"space-between"}}><span>{msg.m}</span><button onClick={()=>setMsg(null)} style={{background:"none",border:"none",fontWeight:700,cursor:"pointer",color:"inherit"}}>&times;</button></div>}
@@ -1401,13 +1410,13 @@ export default function Walkthrough() {
             <div style={{textAlign:"center",padding:"20px 0"}}>
               <div style={{fontSize:48,marginBottom:8}}>[CAM]</div>
               <div style={{fontSize:14,color:"#6b7280",marginBottom:20}}>Photograph the nameplate or the item itself. AI fills in the rest.</div>
-              <label style={{display:"block",width:"100%",padding:24,borderRadius:14,background:mode==="receive"?"linear-gradient(135deg,#16a34a,#15803d)":"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",fontSize:17,fontWeight:800,cursor:"pointer",textAlign:"center"}}>
+              <label style={{display:"block",boxSizing:"border-box",width:"100%",padding:"18px 16px",borderRadius:14,background:mode==="receive"?"linear-gradient(135deg,#16a34a,#15803d)":"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",textAlign:"center"}}>
                 <input ref={qcFileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];e.target.value="";if(f)handleQuickScan(f);}}/>
                 CAPTURE ITEM
               </label>
             </div>
           </div>
-          <button onClick={()=>{setQcPhase("location");setQcCount(0);setView("inventory");loadInventory();}} style={{width:"100%",padding:14,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#475569",fontSize:14,fontWeight:700,cursor:"pointer"}}>Finish session . View inventory</button>
+          <button onClick={()=>{setQcPhase("location");setQcCount(0);setView("inventory");loadInventory();}} style={{width:"100%",boxSizing:"border-box",padding:14,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#475569",fontSize:14,fontWeight:700,cursor:"pointer"}}>Finish session . View inventory</button>
         </div>}
 
         {/* PHASE: ANALYZING */}
@@ -1459,14 +1468,25 @@ export default function Walkthrough() {
             </div>
           </div>
 
+          {/* Track as bulk override */}
+          <div style={card}>
+            <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
+              <input type="checkbox" checked={qcItem.bulkOverride!==null?qcItem.bulkOverride:BULK_TYPES.has(qcItem.equipmentType)} onChange={e=>setQcItem(i=>({...i,bulkOverride:e.target.checked}))} style={{width:22,height:22,accentColor:mode==="receive"?"#16a34a":"#0891b2",cursor:"pointer"}}/>
+              <div>
+                <div style={{fontSize:14,fontWeight:700,color:"#1e293b"}}>Track as bulk</div>
+                <div style={{fontSize:11,color:"#6b7280",marginTop:2}}>{(qcItem.bulkOverride!==null?qcItem.bulkOverride:BULK_TYPES.has(qcItem.equipmentType))?"Multiple identical units stored as one row with count":"Single unit with serial number"}</div>
+              </div>
+            </label>
+          </div>
+
           {/* Qty (bulk) or S/N (serialized) */}
           <div style={card}>
-            {BULK_TYPES.has(qcItem.equipmentType)?<>
+            {(qcItem.bulkOverride!==null?qcItem.bulkOverride:BULK_TYPES.has(qcItem.equipmentType))?<>
               <label style={lbl}>Quantity *</label>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <button onClick={()=>setQcItem(i=>({...i,qty:Math.max(1,(parseInt(i.qty)||1)-1)}))} style={{width:56,height:56,borderRadius:12,border:"2px solid #0891b2",background:"#fff",color:"#0891b2",fontSize:24,fontWeight:800,cursor:"pointer"}}>-</button>
-                <input type="number" min="1" value={qcItem.qty} onChange={e=>setQcItem(i=>({...i,qty:parseInt(e.target.value)||1}))} style={{flex:1,padding:"14px 0",textAlign:"center",border:"2px solid #0891b2",borderRadius:12,fontSize:28,fontWeight:800,color:"#0891b2"}}/>
-                <button onClick={()=>setQcItem(i=>({...i,qty:(parseInt(i.qty)||1)+1}))} style={{width:56,height:56,borderRadius:12,border:"2px solid #0891b2",background:"#0891b2",color:"#fff",fontSize:24,fontWeight:800,cursor:"pointer"}}>+</button>
+                <button onClick={()=>setQcItem(i=>({...i,qty:Math.max(1,(parseInt(i.qty)||1)-1)}))} style={{width:56,height:56,borderRadius:12,border:`2px solid ${mode==="receive"?"#16a34a":"#0891b2"}`,background:"#fff",color:mode==="receive"?"#16a34a":"#0891b2",fontSize:24,fontWeight:800,cursor:"pointer"}}>-</button>
+                <input type="number" min="1" value={qcItem.qty} onChange={e=>setQcItem(i=>({...i,qty:parseInt(e.target.value)||1}))} style={{flex:1,padding:"14px 0",textAlign:"center",border:`2px solid ${mode==="receive"?"#16a34a":"#0891b2"}`,borderRadius:12,fontSize:28,fontWeight:800,color:mode==="receive"?"#16a34a":"#0891b2"}}/>
+                <button onClick={()=>setQcItem(i=>({...i,qty:(parseInt(i.qty)||1)+1}))} style={{width:56,height:56,borderRadius:12,border:`2px solid ${mode==="receive"?"#16a34a":"#0891b2"}`,background:mode==="receive"?"#16a34a":"#0891b2",color:"#fff",fontSize:24,fontWeight:800,cursor:"pointer"}}>+</button>
               </div>
               <div style={{fontSize:11,color:"#6b7280",marginTop:6}}>Bulk item. Stored as one row with count.</div>
             </>:<>
