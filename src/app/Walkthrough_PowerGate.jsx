@@ -384,7 +384,7 @@ export default function Walkthrough() {
     if(!file)return;
     setQcPhase("analyzing");setMsg(null);
     try{
-      const compressed=await compressImage(file);
+      const compressed=await compressImage(file,2400,0.85);
       const b64=compressed.split(",")[1];
       let photoUrl=compressed;
       const upPromise=(async()=>{
@@ -499,7 +499,7 @@ export default function Walkthrough() {
     if(!file)return;
     setQcPhase("enumerate_analyzing");setMsg(null);
     try{
-      const compressed=await compressImage(file);
+      const compressed=await compressImage(file,2400,0.85);
       const b64=compressed.split(",")[1];
       let photoUrl=compressed;
       const upPromise=(async()=>{
