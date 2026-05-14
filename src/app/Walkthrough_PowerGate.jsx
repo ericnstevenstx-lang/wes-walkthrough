@@ -260,9 +260,10 @@ export default function Walkthrough() {
   /* -- Decomm Enumeration state -- */
   const [enumComponents,setEnumComponents]=useState([]);
   const [enumParentObs,setEnumParentObs]=useState(null);
-  const [enumPhoto,setEnumPhoto]=useState(null);
+  const [enumPhotos,setEnumPhotos]=useState([]); // array of {dataUrl, b64, photoUrl, uploading}
   const [enumLastTraveler,setEnumLastTraveler]=useState(null);
   const enumFileRef=useRef(null);
+  const enumGalleryRef=useRef(null);
 
   useEffect(()=>{(async()=>{
     try{if(!loc){
@@ -490,32 +491,67 @@ export default function Walkthrough() {
     if(!qcItem)return;
     if(mode==="quick"&&!qcLocationCode.trim()){setMsg({t:"error",m:"Set location first"});setQcPhase("location");return;}
     if(mode==="receive"&&!job.preparedBy.trim()){setMsg({t:"error",m:"Received By required"});setQcPhase("location");return;}
-    setEnumComponents([]);setEnumParentObs(null);setEnumPhoto(null);
+    setEnumComponents([]);setEnumParentObs(null);setEnumPhotos([]);
     setQcPhase("enumerate_capture");
     setTimeout(()=>enumFileRef.current?.click(),100);
   };
 
   const handleEnumerateCapture=async(file)=>{
     if(!file)return;
-    setQcPhase("enumerate_analyzing");setMsg(null);
+    setMsg(null);
     try{
       const compressed=await compressImage(file,2400,0.85);
       const b64=compressed.split(",")[1];
-      let photoUrl=compressed;
-      const upPromise=(async()=>{
+      const entry={dataUrl:compressed,b64,photoUrl:compressed,uploading:true};
+      setEnumPhotos(prev=>[...prev,entry]);
+      // Background upload (doesn't block capture loop)
+      (async()=>{
         try{
           const blob=await(await fetch(compressed)).blob();
           const fname=`${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
           const upResp=await fetch(`${SB}/storage/v1/object/item-photos/${fname}`,{method:"POST",headers:{apikey:SK,Authorization:`Bearer ${SK}`,"Content-Type":"image/jpeg"},body:blob});
-          if(upResp.ok)photoUrl=`${SB}/storage/v1/object/public/item-photos/${fname}`;
-        }catch{}
+          if(upResp.ok){
+            const photoUrl=`${SB}/storage/v1/object/public/item-photos/${fname}`;
+            setEnumPhotos(prev=>prev.map(p=>p.b64===b64?{...p,photoUrl,uploading:false}:p));
+          }else{
+            setEnumPhotos(prev=>prev.map(p=>p.b64===b64?{...p,uploading:false}:p));
+          }
+        }catch{
+          setEnumPhotos(prev=>prev.map(p=>p.b64===b64?{...p,uploading:false}:p));
+        }
       })();
-      const resp=await fetch(`${SB}/functions/v1/scan-breaker-lineup`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image_base64:b64,image_media_type:"image/jpeg"})});
+    }catch(e){
+      setMsg({t:"error",m:"Capture failed: "+e.message});
+    }
+  };
+
+  const rmEnumPhoto=(idx)=>setEnumPhotos(prev=>prev.filter((_,i)=>i!==idx));
+
+  const handleEnumerateBatchCapture=async(files)=>{
+    if(!files||files.length===0)return;
+    const remaining=8-enumPhotos.length;
+    const arr=Array.from(files).slice(0,Math.max(0,remaining));
+    if(arr.length===0){setMsg({t:"error",m:"Already at 8 photo limit"});return;}
+    if(files.length>arr.length)setMsg({t:"info",m:`Adding ${arr.length}, skipped ${files.length-arr.length} (8 photo max)`});
+    for(const f of arr){
+      // sequential so order is preserved
+      await handleEnumerateCapture(f);
+    }
+  };
+
+  const handleEnumerateAnalyze=async()=>{
+    if(enumPhotos.length===0){setMsg({t:"error",m:"Capture at least one photo first"});return;}
+    setQcPhase("enumerate_analyzing");setMsg(null);
+    try{
+      const images=enumPhotos.map(p=>({base64:p.b64,media_type:"image/jpeg"}));
+      const resp=await fetch(`${SB}/functions/v1/scan-breaker-lineup`,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({images}),
+      });
       if(!resp.ok){const txt=await resp.text();throw new Error(`AI ${resp.status}: ${txt.slice(0,120)}`);}
       const p=await resp.json();
       if(p.error)throw new Error(p.error);
-      await upPromise;
-      setEnumPhoto(photoUrl);
       setEnumComponents((p.components||[]).map(c=>({
         position:c.position||"",
         equipment_type:c.equipment_type||"Circuit Breaker",
@@ -526,6 +562,8 @@ export default function Walkthrough() {
         voltage:c.voltage||"",
         notes:c.notes||"",
         grade:"C",
+        source_image:c.source_image||null,
+        confidence:c.confidence||null,
       })));
       setEnumParentObs(p.parent_observations||null);
       setQcPhase("enumerate_review");
@@ -575,9 +613,13 @@ export default function Walkthrough() {
       if(qcItem.photo&&qcItem.photo.startsWith(SB)){try{
         await dbF("item_photos",{method:"POST",body:JSON.stringify({reference_id:parentId,reference_type:"inventory_item",photo_url:qcItem.photo,photo_role:"nameplate",is_ebay_ready:false})});
       }catch{}}
-      if(enumPhoto&&enumPhoto.startsWith(SB)){try{
-        await dbF("item_photos",{method:"POST",body:JSON.stringify({reference_id:parentId,reference_type:"inventory_item",photo_url:enumPhoto,photo_role:"lineup",is_ebay_ready:false})});
-      }catch{}}
+      // Save all lineup photos (one or more)
+      for(let pi=0;pi<enumPhotos.length;pi++){
+        const ep=enumPhotos[pi];
+        if(ep.photoUrl&&ep.photoUrl.startsWith(SB)){try{
+          await dbF("item_photos",{method:"POST",body:JSON.stringify({reference_id:parentId,reference_type:"inventory_item",photo_url:ep.photoUrl,photo_role:enumPhotos.length>1?`lineup_${pi+1}`:"lineup",is_ebay_ready:false})});
+        }catch{}}
+      }
 
       const childRows=enumComponents.map((c,idx)=>{
         const cid=`INV-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,5)}${idx.toString(36)}`;
@@ -623,7 +665,7 @@ export default function Walkthrough() {
 
       setQcSession(prev=>[...prev,{...parentRow,_photo:qcItem.photo,_traveler:travelerNumber,_componentCount:childRows.length}]);
       setEnumLastTraveler({id:travelerId,number:travelerNumber,parentId,parentRow,childRows});
-      setQcItem(null);setEnumComponents([]);setEnumPhoto(null);setEnumParentObs(null);
+      setQcItem(null);setEnumComponents([]);setEnumPhotos([]);setEnumParentObs(null);
       setMsg({t:"success",m:`${travelerNumber} created with ${childRows.length} component${childRows.length===1?"":"s"}`});
       setQcPhase("enumerate_success");
     }catch(e){
@@ -1567,28 +1609,62 @@ ${header}
         {qcPhase==="enumerate_capture"&&<div style={card}>
           <div style={{textAlign:"center",padding:"20px 0"}}>
             <div style={{fontSize:11,fontWeight:700,color:"#7c3aed",marginBottom:8,letterSpacing:1}}>STEP 2 OF 2 . COMPONENT LINEUP</div>
-            <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>Photograph the open front face</div>
-            <div style={{fontSize:12,color:"#6b7280",marginBottom:20,padding:"0 8px"}}>Capture all visible breakers/buckets in one shot. AI will enumerate each component into a traveler list.</div>
-            <label style={{display:"block",boxSizing:"border-box",width:"100%",padding:"18px 16px",borderRadius:14,background:"linear-gradient(135deg,#7c3aed,#5b21b6)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",textAlign:"center"}}>
-              <input ref={enumFileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];e.target.value="";if(f)handleEnumerateCapture(f);}}/>
-              CAPTURE LINEUP
-            </label>
-            <button onClick={()=>setQcPhase("review")} style={{marginTop:12,padding:"10px 18px",borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontSize:13,fontWeight:600,cursor:"pointer"}}>Back</button>
+            <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>{enumPhotos.length===0?"Photograph the open front face":"Add more sections or analyze"}</div>
+            <div style={{fontSize:12,color:"#6b7280",marginBottom:16,padding:"0 8px"}}>
+              {enumPhotos.length===0
+                ?"Wide MCC or switchgear? Capture multiple overlapping shots (left, middle, right), or upload several photos at once from your gallery. AI merges them into one continuous lineup."
+                :`${enumPhotos.length} photo${enumPhotos.length===1?"":"s"} captured. Add more from camera or gallery, or analyze all to build the traveler.`}
+            </div>
+
+            {enumPhotos.length>0&&<div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:6,marginBottom:14}}>
+              {enumPhotos.map((p,i)=>(
+                <div key={i} style={{position:"relative",flexShrink:0}}>
+                  <img src={p.dataUrl} alt="" style={{width:100,height:100,objectFit:"cover",borderRadius:8,border:"2px solid #7c3aed"}}/>
+                  <button onClick={()=>rmEnumPhoto(i)} style={{position:"absolute",top:-6,right:-6,width:22,height:22,borderRadius:"50%",border:"none",background:"#dc2626",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer",lineHeight:1,padding:0}}>&times;</button>
+                  <div style={{position:"absolute",bottom:4,left:4,padding:"2px 6px",borderRadius:4,background:"rgba(124,58,237,0.92)",color:"#fff",fontSize:10,fontWeight:800}}>#{i+1}</div>
+                  {p.uploading&&<div style={{position:"absolute",top:4,right:18,padding:"2px 5px",borderRadius:4,background:"rgba(0,0,0,0.6)",color:"#fff",fontSize:9,fontWeight:700}}>up...</div>}
+                </div>
+              ))}
+            </div>}
+
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <label style={{flex:1,boxSizing:"border-box",padding:"18px 8px",borderRadius:14,background:enumPhotos.length===0?"linear-gradient(135deg,#7c3aed,#5b21b6)":"#fff",border:enumPhotos.length===0?"none":"2px dashed #7c3aed",color:enumPhotos.length===0?"#fff":"#7c3aed",fontSize:13,fontWeight:800,cursor:"pointer",textAlign:"center"}}>
+                <input ref={enumFileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];e.target.value="";if(f)handleEnumerateCapture(f);}}/>
+                [CAM] {enumPhotos.length===0?"CAPTURE":"+ CAMERA"}
+              </label>
+              <label style={{flex:1,boxSizing:"border-box",padding:"18px 8px",borderRadius:14,background:enumPhotos.length===0?"#fff":"#fff",border:"2px dashed #7c3aed",color:"#7c3aed",fontSize:13,fontWeight:800,cursor:"pointer",textAlign:"center"}}>
+                <input ref={enumGalleryRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{const fs=e.target.files;e.target.value="";if(fs&&fs.length>0)handleEnumerateBatchCapture(fs);}}/>
+                [GAL] UPLOAD
+              </label>
+            </div>
+
+            {enumPhotos.length>0&&<button onClick={handleEnumerateAnalyze} style={{width:"100%",boxSizing:"border-box",padding:"18px 16px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#7c3aed,#5b21b6)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:8}}>
+              ANALYZE {enumPhotos.length} PHOTO{enumPhotos.length===1?"":"S"} &rarr;
+            </button>}
+
+            <button onClick={()=>{setEnumPhotos([]);setQcPhase("review");}} style={{marginTop:4,padding:"10px 18px",borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel . Back to parent review</button>
           </div>
         </div>}
 
         {qcPhase==="enumerate_analyzing"&&<div style={card}>
           <div style={{textAlign:"center",padding:"40px 0"}}>
             <div style={{fontSize:36,marginBottom:12}}>...</div>
-            <div style={{fontSize:16,fontWeight:700,color:"#7c3aed"}}>AI enumerating components...</div>
-            <div style={{fontSize:12,color:"#6b7280",marginTop:6}}>Identifying position, type, mfr, model, amperage for each unit</div>
+            <div style={{fontSize:16,fontWeight:700,color:"#7c3aed"}}>AI enumerating {enumPhotos.length} photo{enumPhotos.length===1?"":"s"}...</div>
+            <div style={{fontSize:12,color:"#6b7280",marginTop:6}}>{enumPhotos.length>1?"Merging into one continuous lineup":"Identifying position, type, mfr, model, amperage for each unit"}</div>
           </div>
         </div>}
 
         {qcPhase==="enumerate_review"&&<div>
           <div style={card}>
             <div style={{fontSize:11,fontWeight:700,color:"#7c3aed",marginBottom:8,letterSpacing:1}}>REVIEW &amp; EDIT COMPONENTS</div>
-            {enumPhoto&&<img src={enumPhoto} alt="lineup" style={{width:"100%",maxHeight:180,objectFit:"cover",borderRadius:10,marginBottom:12}}/>}
+            {enumPhotos.length>0&&<div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:6,marginBottom:12}}>
+              {enumPhotos.map((p,i)=>(
+                <div key={i} style={{position:"relative",flexShrink:0}}>
+                  <img src={p.dataUrl} alt="" style={{width:enumPhotos.length===1?"100%":140,height:enumPhotos.length===1?"auto":100,maxHeight:enumPhotos.length===1?180:100,objectFit:"cover",borderRadius:8,border:"1px solid #e5e7eb"}}/>
+                  {enumPhotos.length>1&&<div style={{position:"absolute",bottom:4,left:4,padding:"2px 6px",borderRadius:4,background:"rgba(124,58,237,0.92)",color:"#fff",fontSize:10,fontWeight:800}}>#{i+1}</div>}
+                </div>
+              ))}
+            </div>}
             {enumParentObs&&<div style={{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:8,padding:10,marginBottom:12,fontSize:11,color:"#78350f"}}>
               <strong>Parent observations:</strong> {[enumParentObs.bus_rating?`Bus ${enumParentObs.bus_rating}A`:"",enumParentObs.voltage_class?enumParentObs.voltage_class:"",enumParentObs.visible_sections?`${enumParentObs.visible_sections} sections`:"",enumParentObs.condition_notes||""].filter(Boolean).join(" . ")||"(none)"}
             </div>}
@@ -1625,7 +1701,7 @@ ${header}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <button onClick={handleEnumerateSave} disabled={enumComponents.length===0} style={{padding:18,borderRadius:12,border:"none",background:enumComponents.length===0?"#94a3b8":"linear-gradient(135deg,#7c3aed,#5b21b6)",color:"#fff",fontSize:16,fontWeight:800,cursor:enumComponents.length===0?"not-allowed":"pointer"}}>Save &amp; Issue Traveler</button>
             <button onClick={()=>setQcPhase("enumerate_capture")} style={{padding:12,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontSize:13,fontWeight:600,cursor:"pointer"}}>Recapture Lineup</button>
-            <button onClick={()=>{setEnumComponents([]);setEnumPhoto(null);setEnumParentObs(null);setQcPhase("review");}} style={{padding:12,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel . Back to parent review</button>
+            <button onClick={()=>{setEnumComponents([]);setEnumPhotos([]);setEnumParentObs(null);setQcPhase("review");}} style={{padding:12,borderRadius:10,border:"1px solid #d1d5db",background:"#fff",color:"#64748b",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel . Back to parent review</button>
           </div>
         </div>}
 
