@@ -385,7 +385,7 @@ export default function Walkthrough() {
     if(!file)return;
     setQcPhase("analyzing");setMsg(null);
     try{
-      const compressed=await compressImage(file,2400,0.85);
+      const compressed=await compressImage(file,2576,0.92);
       const b64=compressed.split(",")[1];
       let photoUrl=compressed;
       const upPromise=(async()=>{
@@ -500,7 +500,7 @@ export default function Walkthrough() {
     if(!file)return;
     setMsg(null);
     try{
-      const compressed=await compressImage(file,2400,0.85);
+      const compressed=await compressImage(file,2576,0.92);
       const b64=compressed.split(",")[1];
       const entry={dataUrl:compressed,b64,photoUrl:compressed,uploading:true};
       setEnumPhotos(prev=>[...prev,entry]);
